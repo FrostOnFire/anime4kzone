@@ -1,5 +1,6 @@
 // script.js
 
+const SERVER_URL = 'http://203.0.113.20:54559';
 const suggestions = document.getElementById('suggestions');
 const titleInput = document.getElementById('title-input');
 const episodeInput = document.getElementById('episode-input');
@@ -187,6 +188,7 @@ function checkFormValidity() {
 }
 
 Dropzone.options.videoDropzone = {
+    url: `${SERVER_URL}/upload`,
     maxFilesize: 1024,
     acceptedFiles: ".mp4,.avi,.mov",
     autoProcessQueue: false,
@@ -286,7 +288,7 @@ function resetForm() {
 }
 
 function getQueueStatus() {
-    fetch('/queue-status')
+    fetch(`${SERVER_URL}/queue-status`)
     .then(response => response.json())
     .then(data => {
         queueStatusElement.textContent = `Videos in queue: ${data.queue_length}`;

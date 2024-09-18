@@ -1,14 +1,27 @@
+// server.js
+
 const express = require('express');
 const fileUpload = require('express-fileupload');
 const { Worker } = require('worker_threads');
 const path = require('path');
 const cors = require('cors');
 const fs = require('fs');
-const { v4: uuidv4 } = require('uuid');  // Import UUID for unique directory names
+const { v4: uuidv4 } = require('uuid');
 
 const app = express();
 
-app.use(cors());
+// Настройка CORS для разрешения запросов с двух портов (HTTP и HTTPS)
+app.use(cors({
+    origin: [
+        'http://203.0.113.20:54388', // HTTP порт клиента
+        'https://203.0.113.20:54966' // HTTPS порт клиента
+    ],
+    credentials: true
+}));
+
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
 app.use(express.static('public'));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/processed', express.static(path.join(__dirname, 'processed')));
@@ -17,81 +30,126 @@ app.use(fileUpload({ limits: { fileSize: 1024 * 1024 * 1024 } }));
 const uploadDir = path.join(__dirname, 'uploads');
 const processedDir = path.join(__dirname, 'processed');
 
-// In-memory store for job statuses
-const jobs = {};
-
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 if (!fs.existsSync(processedDir)) fs.mkdirSync(processedDir, { recursive: true });
 
-// Route to handle file uploads
+// Очередь задач в памяти
+const jobQueue = [];
+let isProcessing = false;
+
+// Маршрут для обработки загрузки файлов и метаданных
 app.post('/upload', async (req, res) => {
-    if (!req.files || Object.keys(req.files).length === 0) {
-        return res.status(400).send('No files were uploaded.');
-    }
-
-    const uniqueId = uuidv4();  // Generate a unique identifier for this upload
-    const videoFile = req.files.file;
-
-    const safeFileName = path.basename(videoFile.name);
-    const inputPath = path.join(uploadDir, safeFileName);
-    const outputPath = path.join(processedDir, `${uniqueId}_${safeFileName}`);
-
-    // Store the job status as "processing"
-    jobs[uniqueId] = { status: 'processing', downloadUrl: null };
-
-    videoFile.mv(inputPath, function (err) {
-        if (err) {
-            jobs[uniqueId].status = 'error';
-            return res.status(500).send(err);
+    try {
+        if (!req.files || Object.keys(req.files).length === 0) {
+            return res.status(400).send('No files were uploaded.');
         }
 
-        console.log(`Starting video processing for: ${videoFile.name}`);
+        // Извлекаем метаданные из req.body
+        const metadata = req.body;
 
-        // Start a new worker thread to process the video
-        const worker = new Worker(path.join(__dirname, 'videoProcessor.js'), {
-            workerData: { inputPath, outputPath }
-        });
+        // Генерируем уникальный идентификатор для этой задачи
+        const uniqueId = uuidv4();
+        const videoFile = req.files.file;
 
-        worker.on('message', (result) => {
-            if (result.success) {
-                jobs[uniqueId].status = 'done';
-                jobs[uniqueId].downloadUrl = `/processed/${uniqueId}_${safeFileName}`;
-                console.log(`Video processed successfully: ${outputPath}`);
-            } else {
-                jobs[uniqueId].status = 'error';
-                console.error(`Error processing video: ${uniqueId}`);
+        const safeFileName = path.basename(videoFile.name);
+        const inputPath = path.join(uploadDir, `${uniqueId}_${safeFileName}`);
+        const outputPath = path.join(processedDir, `${uniqueId}_${safeFileName}`);
+
+        // Перемещаем загруженный файл в директорию uploads
+        videoFile.mv(inputPath, function (err) {
+            if (err) {
+                console.error(`Error saving uploaded file: ${err}`);
+                return res.status(500).send(err);
             }
-        });
 
-        worker.on('error', (error) => {
-            jobs[uniqueId].status = 'error';
-            console.error(`Worker error for job ${uniqueId}:`, error);
-        });
+            // Создаём объект задачи и добавляем его в очередь
+            const job = {
+                id: uniqueId,
+                inputPath,
+                outputPath,
+                metadata,
+                status: 'queued',
+            };
 
-        worker.on('exit', (code) => {
-            if (code !== 0) {
-                jobs[uniqueId].status = 'error';
-                console.error(`Worker stopped with exit code ${code} for job ${uniqueId}`);
+            jobQueue.push(job);
+            console.log(`Job ${uniqueId} added to the queue`);
+
+            // Запускаем обработку, если она не запущена
+            if (!isProcessing) {
+                processNextJob();
             }
+
+            res.json({ uniqueId, message: 'Your video is added to the processing queue.' });
         });
-
-        res.json({ uniqueId });
-    });
-});
-
-// Check the status of a job
-app.get('/status/:id', (req, res) => {
-    const job = jobs[req.params.id];
-    if (job) {
-        res.json(job);
-    } else {
-        res.status(404).send('Job not found');
+    } catch (error) {
+        console.error(`Error in /upload route: ${error}`);
+        res.status(500).send('Server error');
     }
 });
 
-// Serve the static files (for frontend, assuming you have an index.html in the public folder)
+// Функция для обработки следующей задачи в очереди
+function processNextJob() {
+    if (jobQueue.length === 0) {
+        isProcessing = false;
+        return;
+    }
+
+    isProcessing = true;
+    const job = jobQueue.shift();
+
+    console.log(`Starting processing job ${job.id}`);
+
+    // Запускаем новый поток worker для обработки видео
+    const worker = new Worker(path.join(__dirname, 'videoProcessor.js'), {
+        workerData: { inputPath: job.inputPath, outputPath: job.outputPath }
+    });
+
+    worker.on('message', (result) => {
+        if (result.success) {
+            console.log(`Job ${job.id} processed successfully`);
+
+            // TODO: Загрузка обработанного видео в Google Storage
+            // TODO: Отправка метаданных в базу данных
+            console.log(`Job ${job.id}: Uploading to Google Storage and sending metadata to database`);
+            // Здесь будет код для загрузки и работы с базой данных
+
+            // После завершения, обрабатываем следующую задачу
+            processNextJob();
+        } else {
+            console.error(`Error processing job ${job.id}`);
+            // Опционально, обработка повторных попыток или логирование ошибок
+
+            // Переходим к следующей задаче
+            processNextJob();
+        }
+    });
+
+    worker.on('error', (error) => {
+        console.error(`Worker error for job ${job.id}:`, error);
+
+        // Переходим к следующей задаче
+        processNextJob();
+    });
+
+    worker.on('exit', (code) => {
+        if (code !== 0) {
+            console.error(`Worker stopped with exit code ${code} for job ${job.id}`);
+            // Переходим к следующей задаче
+            processNextJob();
+        }
+    });
+}
+
+// Эндпоинт для получения статуса очереди
+app.get('/queue-status', (req, res) => {
+    res.json({ queue_length: jobQueue.length + (isProcessing ? 1 : 0) });
+});
+
+// Обслуживание статических файлов (для фронтенда)
 app.use(express.static('public'));
 
-app.listen(8080, '0.0.0.0', () => {
-    console.log('Server started on http://0.0.0.0:8080');
+// Запуск сервера на указанном порту
+const PORT = 54559; // Порт сервера
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server started on http://0.0.0.0:${PORT}`);
 });

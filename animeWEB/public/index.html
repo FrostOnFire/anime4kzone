@@ -3,98 +3,41 @@
 <head>
     <meta charset="UTF-8">
     <title>Video Enhancer</title>
+    <!-- Подключаем стили и скрипты -->
     <link href="https://unpkg.com/dropzone/dist/dropzone.css" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <h1>Video Enhancer</h1>
 
-    <!-- Form to input title, episode, chronology, and voiceover -->
+    <!-- Форма для ввода данных -->
     <form id="title-form">
-        <label for="title-input">Enter anime title:</label>
-        <input type="text" id="title-input" name="title" autocomplete="off" placeholder="Start typing anime title..." required>
-        <ul id="suggestions" style="display: none;"></ul>
-
-        <label for="episode-input">Enter episode number:</label>
-        <input type="number" id="episode-input" name="episode" min="1" required disabled>
-
-        <div id="genre-container">
-            <label for="genres">Genres:</label>
-            <p id="genres"></p>
-        </div>
-
-        <div id="info-container">
-            <div id="rating-container">
-                <label for="rating">Rating:</label>
-                <p id="rating">N/A</p>
-            </div>
-            <div id="episodes-container">
-                <label for="total-episodes">Total Episodes:</label>
-                <p id="total-episodes">N/A</p>
-            </div>
-        </div>
-
-        <!-- Timing for opening -->
-        <div id="timing-container">
-            <label for="opening-start">Opening Start:</label>
-            <input type="number" id="opening-start-minutes" name="opening-start-minutes" placeholder="Minutes" min="0" required disabled>
-            <input type="number" id="opening-start-seconds" name="opening-start-seconds" placeholder="Seconds" min="0" max="59" required disabled>
-
-            <label for="opening-end">Opening End:</label>
-            <input type="number" id="opening-end-minutes" name="opening-end-minutes" placeholder="Minutes" min="0" disabled>
-            <input type="number" id="opening-end-seconds" name="opening-end-seconds" placeholder="Seconds" min="0" max="59" disabled>
-        </div>
-
-        <label for="chronology-input">Enter chronology number:</label>
-        <input type="number" id="chronology-input" name="chronology" min="1" disabled>
-
-        <label for="franchise-input">Franchise Name:</label>
-        <input type="text" id="franchise-input" name="franchise" disabled>
-
-        <label for="description-input">Description:</label>
-        <textarea id="description-input" name="description" rows="4" cols="50" disabled></textarea>
-
-        <label for="voiceover-select">Select voiceover:</label>
-        <select id="voiceover-select" name="voiceover" required disabled>
-            <option value="">Select voiceover</option>
-            <option value="Cuba77">Cuba77</option>
-            <option value="AniLibria">AniLibria</option>
-            <option value="SHIZA Project">SHIZA Project</option>
-            <option value="JAM">JAM</option>
-            <option value="AniDub">AniDub</option>
-            <option value="AniFilm">AniFilm</option>
-            <option value="Студийная Банда">Студийная Банда</option>
-        </select>
-
-        <!-- Hidden fields to store selected anime data -->
-        <input type="hidden" id="anime-id" name="anime_id">
-        <input type="hidden" id="anime-title" name="anime_title">
-        <input type="hidden" id="anime-cover" name="anime_cover">
-        <input type="hidden" id="anime-genre" name="anime_genre">
-        <input type="hidden" id="anime-total-episodes" name="anime_total_episodes">
+        <!-- Поля ввода (название, эпизод, хронометраж и т.д.) -->
+        <!-- Здесь должны быть ваши элементы формы -->
     </form>
 
     <div id="container">
-        <!-- Dropzone on the left -->
+        <!-- Dropzone слева -->
         <div id="dropzone-container">
-            <form action="/upload" class="dropzone disabled" id="video-dropzone"></form>
+            <!-- Указываем action формы с полным URL сервера -->
+            <form action="http://203.0.113.20:54559/upload" class="dropzone disabled" id="video-dropzone"></form>
         </div>
 
-        <!-- Cover image on the right -->
+        <!-- Изображение обложки справа -->
         <div id="cover-container">
             <img id="cover-image" src="" alt="Anime Cover">
         </div>
     </div>
 
-    <!-- Submit button -->
+    <!-- Кнопка отправки -->
     <button id="submit-btn" disabled>Submit</button>
 
-    <!-- Log section for messages -->
+    <!-- Секция для сообщений -->
     <p id="queue-status"></p>
     <p id="log"></p>
     <p id="error"></p>
 
-    <!-- Dropzone Script -->
+    <!-- Подключение скриптов -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dropzone/5.7.0/dropzone.min.js"></script>
     <script src="script.js"></script>
 </body>
