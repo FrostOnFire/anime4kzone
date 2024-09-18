@@ -149,7 +149,7 @@ app.get('/queue-status', (req, res) => {
 app.use(express.static('public'));
 
 // Запуск сервера на указанном порту
-const PORT = 54559; // Порт сервера
+const PORT = 9090; // Порт сервера
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server started on http://0.0.0.0:${PORT}`);
 });
