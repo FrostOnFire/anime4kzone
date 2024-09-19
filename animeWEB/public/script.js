@@ -301,7 +301,7 @@ function resetForm() {
 }
 
 function getQueueStatus() {
-    fetch(`${SERVER_URL}/queue-status`)
+    fetch(`https://203.0.113.20:54559/queue-status`)
     .then(response => response.json())
     .then(data => {
         queueStatusElement.textContent = `Videos in queue: ${data.queue_length}`;

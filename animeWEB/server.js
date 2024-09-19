@@ -14,8 +14,7 @@ const app = express();
 // Настройка CORS для разрешения запросов с двух портов (HTTP и HTTPS)
 app.use(cors({
     origin: [
-        'http://203.0.113.20:54388', // HTTP порт клиента
-        'https://203.0.113.20:54966' // HTTPS порт клиента
+        'https://203.0.113.20:54966' // Только HTTPS
     ],
     credentials: true
 }));
