@@ -162,7 +162,12 @@ app.use(express.static('public'));
 
 
 // Запуск сервера на указанном порту
-const PORT = 9090; // Внутренний порт
-http.createServer(app).listen(PORT, '0.0.0.0', () => {
+const PORT = 9090;
+const server = http.createServer(app);
+
+// Устанавливаем таймаут для сервера (например, 10 минут)
+server.timeout = 3600000; // время в миллисекундах (600000 мс = 10 минут) 3600000 = 1 час
+
+server.listen(PORT, '0.0.0.0', () => {
     console.log(`Server started on http://0.0.0.0:${PORT}`);
 });

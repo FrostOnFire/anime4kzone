@@ -222,10 +222,12 @@ Dropzone.options.videoDropzone = {
         });
 
         this.on("addedfile", function (file) {
+            console.log('File added:', file.name);
             checkFormValidity();
         });
 
         this.on("removedfile", function (file) {
+            console.log('File removed:', file.name);
             checkFormValidity();
         });
 
