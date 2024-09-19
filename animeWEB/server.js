@@ -19,11 +19,11 @@ app.use(cors({
 
 app.options('*', cors());
 
-app.use((req, res, next) => {
-    console.log(`Request protocol: ${req.protocol}`);
-    console.log(`Request headers:`, req.headers);
-    next();
-});
+//app.use((req, res, next) => {
+//    console.log(`Request protocol: ${req.protocol}`);
+//    console.log(`Request headers:`, req.headers);
+//    next();
+//});
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
