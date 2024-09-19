@@ -39,7 +39,7 @@ app.use(fileUpload({
     limits: { fileSize: 3 * 1024 * 1024 * 1024 },
     useTempFiles: true,
     tempFileDir: '/tmp/',
-    debug: true,
+    //debug: true,
     uploadTimeout: 3600000 // 30 минут в миллисекундах
 }));
 
