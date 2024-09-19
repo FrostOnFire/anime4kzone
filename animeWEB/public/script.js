@@ -252,7 +252,20 @@ Dropzone.options.videoDropzone = {
         });
 
         this.on("error", function (file, response) {
-            errorElement.textContent = "Error uploading video.";
+            console.error('Error uploading file:', response);
+            let message = '';
+        
+            if (typeof response === 'string') {
+                message = response;
+            } else if (response && response.message) {
+                message = response.message;
+            } else if (response && response.error) {
+                message = response.error;
+            } else {
+                message = 'Unknown error occurred during upload.';
+            }
+        
+            errorElement.textContent = `Error uploading video: ${message}`;
         });
     }
 };
