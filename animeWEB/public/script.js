@@ -1,6 +1,6 @@
 // script.js
 
-const SERVER_URL = 'https://203.0.113.20:54559';
+const SERVER_URL = 'http://203.0.113.20:54559';
 const suggestions = document.getElementById('suggestions');
 const titleInput = document.getElementById('title-input');
 const episodeInput = document.getElementById('episode-input');
