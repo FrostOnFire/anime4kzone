@@ -1,6 +1,6 @@
 // script.js
 
-const SERVER_URL = 'http://203.0.113.20:54559';
+const SERVER_URL = 'https://203.0.113.20:54559';
 const suggestions = document.getElementById('suggestions');
 const titleInput = document.getElementById('title-input');
 const episodeInput = document.getElementById('episode-input');
@@ -173,19 +173,32 @@ function calculateOpeningEnd() {
 function checkFormValidity() {
     const isTitleFilled = titleInput.value.trim() !== '';
     const isEpisodeFilled = episodeInput.value.trim() !== '';
+    const isChronologyFilled = chronologyInput.value.trim() !== '';
+    const isFranchiseFilled = franchiseInput.value.trim() !== '';
     const isOpeningStartMinutesFilled = openingStartMinutes.value.trim() !== '';
     const isOpeningStartSecondsFilled = openingStartSeconds.value.trim() !== '';
     const isOpeningEndMinutesFilled = openingEndMinutes.value.trim() !== '';
     const isOpeningEndSecondsFilled = openingEndSeconds.value.trim() !== '';
     const isVoiceoverSelected = voiceoverSelect.value !== '';
     const isVideoUploaded = Dropzone.forElement("#video-dropzone").getAcceptedFiles().length > 0;
-
-    if (isTitleFilled && isEpisodeFilled && isOpeningStartMinutesFilled && isOpeningStartSecondsFilled && isOpeningEndMinutesFilled && isOpeningEndSecondsFilled && isVoiceoverSelected && isVideoUploaded) {
-        submitBtn.disabled = false;
+  
+    if (
+      isTitleFilled &&
+      isEpisodeFilled &&
+      isChronologyFilled &&
+      isFranchiseFilled &&
+      isOpeningStartMinutesFilled &&
+      isOpeningStartSecondsFilled &&
+      isOpeningEndMinutesFilled &&
+      isOpeningEndSecondsFilled &&
+      isVoiceoverSelected &&
+      isVideoUploaded
+    ) {
+      submitBtn.disabled = false;
     } else {
-        submitBtn.disabled = true;
+      submitBtn.disabled = true;
     }
-}
+  }
 
 Dropzone.options.videoDropzone = {
     url: `${SERVER_URL}/upload`,

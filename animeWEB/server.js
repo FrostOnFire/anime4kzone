@@ -148,8 +148,15 @@ app.get('/queue-status', (req, res) => {
 // Обслуживание статических файлов (для фронтенда)
 app.use(express.static('public'));
 
+
+const options = {
+    key: fs.readFileSync('/etc/ssl/private/video-enhancer.key'),
+    cert: fs.readFileSync('/etc/ssl/certs/video-enhancer.crt'),
+  };
+
+
 // Запуск сервера на указанном порту
 const PORT = 9090; // Порт сервера
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server started on http://0.0.0.0:${PORT}`);
-});
+https.createServer(options, app).listen(PORT, '0.0.0.0', () => {
+    console.log(`Server started on https://0.0.0.0:${PORT}`);
+  });
