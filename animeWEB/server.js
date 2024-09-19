@@ -13,11 +13,11 @@ const app = express();
 app.set('trust proxy', true);
 
 app.use(cors({
-    origin: [
-        'https://203.0.113.20:54966' // Только HTTPS
-    ],
+    origin: 'http://203.0.113.20:54388', // Адрес вашего клиента
     credentials: true
 }));
+
+app.options('*', cors());
 
 app.use((req, res, next) => {
     console.log(`Request protocol: ${req.protocol}`);
