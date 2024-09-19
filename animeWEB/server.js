@@ -6,7 +6,7 @@ const { Worker } = require('worker_threads');
 const path = require('path');
 const cors = require('cors');
 const fs = require('fs');
-const https = require('https');
+const http = require('http');
 const { v4: uuidv4 } = require('uuid');
 
 const app = express();
@@ -21,6 +21,7 @@ app.use(cors({
 
 app.use((req, res, next) => {
     console.log(`Request protocol: ${req.protocol}`);
+    console.log(`Request headers:`, req.headers);
     next();
 });
 
@@ -154,14 +155,14 @@ app.get('/queue-status', (req, res) => {
 app.use(express.static('public'));
 
 
-const options = {
-    key: fs.readFileSync('/etc/ssl/private/video-enhancer.key'),
-    cert: fs.readFileSync('/etc/ssl/certs/video-enhancer.crt'),
-  };
+//const options = {
+//    key: fs.readFileSync('/etc/ssl/private/video-enhancer.key'),
+//    cert: fs.readFileSync('/etc/ssl/certs/video-enhancer.crt'),
+//  };
 
 
 // Запуск сервера на указанном порту
-const PORT = 9090; // Порт сервера
-https.createServer(options, app).listen(PORT, '0.0.0.0', () => {
-    console.log(`Server started on https://0.0.0.0:${PORT}`);
-  });
+const PORT = 9090; // Внутренний порт
+http.createServer(app).listen(PORT, '0.0.0.0', () => {
+    console.log(`Server started on http://0.0.0.0:${PORT}`);
+});
