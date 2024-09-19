@@ -18,6 +18,10 @@ app.use(cors({
 }));
 
 app.options('*', cors());
+app.use(express.json({ limit: '3gb', timeout: 3600000 }));
+app.use(express.urlencoded({ extended: true, limit: '3gb', timeout: 3600000 }));
+
+
 
 //app.use((req, res, next) => {
 //    console.log(`Request protocol: ${req.protocol}`);
@@ -25,13 +29,19 @@ app.options('*', cors());
 //    next();
 //});
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 
 app.use(express.static('public'));
 app.use(express.static(path.join(__dirname, 'public')));
+
+
 app.use('/processed', express.static(path.join(__dirname, 'processed')));
-app.use(fileUpload({ limits: { fileSize: 1024 * 1024 * 1024 } }));
+app.use(fileUpload({
+    limits: { fileSize: 3 * 1024 * 1024 * 1024 },
+    useTempFiles: true,
+    tempFileDir: '/tmp/',
+    debug: true,
+    uploadTimeout: 3600000 // 30 минут в миллисекундах
+}));
 
 const uploadDir = path.join(__dirname, 'uploads');
 const processedDir = path.join(__dirname, 'processed');
@@ -167,6 +177,10 @@ const server = http.createServer(app);
 
 // Устанавливаем таймаут для сервера (например, 10 минут)
 server.timeout = 3600000; // время в миллисекундах (600000 мс = 10 минут) 3600000 = 1 час
+
+server.headersTimeout = 4000000; // должно быть больше, чем server.timeout
+server.keepAliveTimeout = 4000000;
+
 
 server.listen(PORT, '0.0.0.0', () => {
     console.log(`Server started on http://0.0.0.0:${PORT}`);

@@ -202,11 +202,12 @@ function checkFormValidity() {
 
 Dropzone.options.videoDropzone = {
     url: `${SERVER_URL}/upload`,
-    maxFilesize: 1024,
+    maxFilesize: 3072,
     acceptedFiles: ".mp4,.avi,.mov",
     autoProcessQueue: false,
     maxFiles: 1,
     addRemoveLinks: true,
+    timeout: 3600000,
     init: function () {
         const myDropzone = this;
 
