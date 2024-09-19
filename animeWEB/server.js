@@ -10,8 +10,8 @@ const https = require('https');
 const { v4: uuidv4 } = require('uuid');
 
 const app = express();
+app.set('trust proxy', true);
 
-// Настройка CORS для разрешения запросов с двух портов (HTTP и HTTPS)
 app.use(cors({
     origin: [
         'https://203.0.113.20:54966' // Только HTTPS
