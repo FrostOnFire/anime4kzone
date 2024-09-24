@@ -13,7 +13,7 @@ const app = express();
 app.set('trust proxy', true);
 
 app.use(cors({
-    origin: 'http://203.0.113.20:54388', // Адрес вашего клиента
+    origin: '{{CLIENT_URL}}', // Адрес вашего клиента
     credentials: true
 }));
 
