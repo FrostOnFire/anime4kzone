@@ -47,7 +47,7 @@ echo_info "Установка зависимостей для animeWEB..."
 cd ../animeWEB
 sudo apt install -y nodejs npm
 npm install express express-fileupload uuid cors
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.3/install.sh | bash
+sudo curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.3/install.sh | bash
 export NVM_DIR="$HOME/.nvm"
 # shellcheck source=/dev/null
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
@@ -61,7 +61,7 @@ sudo apt install -y nginx
 # Создание конфигурационного файла Nginx с использованием переменных окружения
 cat <<EOF | sudo tee /etc/nginx/sites-available/video-enhancer-http.conf
 server {
-    listen $EXTERNAL_PORT_HTTP;
+    listen 9092;
     # Убираем фиксированный server_name, чтобы Nginx принимал запросы на любой IP
     # server_name 203.0.113.20;
     
@@ -71,22 +71,13 @@ server {
     location / {
         try_files \$uri \$uri/ =404;
     }
-    
-    # Прокси для сервера
-    location /upload {
-        proxy_pass http://localhost:$EXTERNAL_PORT_SERVER/upload;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-    }
 }
 EOF
 
 # Активируем конфигурацию
 sudo ln -sf /etc/nginx/sites-available/video-enhancer-http.conf /etc/nginx/sites-enabled/
 sudo nginx -t
-sudo systemctl restart nginx
+sudo service nginx restart
 
 echo_info "Получение внешнего IP адреса сервера..."
 EXTERNAL_IP=$(curl -s ifconfig.me)
