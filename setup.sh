@@ -47,10 +47,10 @@ echo_info "Установка зависимостей для animeWEB..."
 cd ../animeWEB
 sudo apt install -y nodejs npm
 npm install express express-fileupload uuid cors
-sudo curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.3/install.sh | bash
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.3/install.sh | bash
 export NVM_DIR="$HOME/.nvm"
 # shellcheck source=/dev/null
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+[ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
 nvm install --lts
 nvm use --lts
 
@@ -140,6 +140,17 @@ echo_info "Обновление CORS origin в server.js..."
 sed -i "s|origin: '{{CLIENT_URL}}'|origin: '$CLIENT_URL'|g" "$SERVER_JS_PATH"
 
 echo_info "Файл server.js обновлён с новым CLIENT_URL."
+
+# Добавление замены строки в degradations.py
+echo_info "Исправление импорта rgb_to_grayscale в degradations.py..."
+DEGRADATIONS_FILE="/usr/local/lib/python3.8/dist-packages/basicsr/data/degradations.py"
+if [ -f "$DEGRADATIONS_FILE" ]; then
+    sed -i "s|from torchvision.transforms.functional_tensor import rgb_to_grayscale|from torchvision.transforms.functional import rgb_to_grayscale|g" "$DEGRADATIONS_FILE"
+    echo_info "Импорт в degradations.py успешно исправлен."
+else
+    echo_error "Файл $DEGRADATIONS_FILE не найден."
+    exit 1
+fi
 
 echo_info "Установка завершена. Настройка завершена успешно."
 
