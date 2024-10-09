@@ -206,6 +206,11 @@ app.post('/update-job', async (req, res) => {
     }
 });
 
+
+app.get('/health', (req, res) => {
+    res.status(200).send('OK');
+});
+
 // Предоставление доступа к загруженным файлам для серверов-работников
 app.get('/uploads/:filename', (req, res) => {
     const filePath = path.join(uploadDir, req.params.filename);
