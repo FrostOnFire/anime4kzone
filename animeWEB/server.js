@@ -1,187 +1,154 @@
-// server.js
+// server.js (Промежуточный сервер)
 
-const express = require('express');
-const fileUpload = require('express-fileupload');
+const redis = require('redis');
 const { Worker } = require('worker_threads');
 const path = require('path');
-const cors = require('cors');
 const fs = require('fs');
-const http = require('http');
-const { v4: uuidv4 } = require('uuid');
+const axios = require('axios');
 
-const app = express();
-app.set('trust proxy', true);
-
-app.use(cors({
-    origin: '{{CLIENT_URL}}', // Адрес вашего клиента
-    credentials: true
-}));
-
-app.options('*', cors());
-app.use(express.json({ limit: '3gb', timeout: 3600000 }));
-app.use(express.urlencoded({ extended: true, limit: '3gb', timeout: 3600000 }));
-
-
-
-//app.use((req, res, next) => {
-//    console.log(`Request protocol: ${req.protocol}`);
-//    console.log(`Request headers:`, req.headers);
-//    next();
-//});
-
-
-app.use(express.static('public'));
-app.use(express.static(path.join(__dirname, 'public')));
-
-
-app.use('/processed', express.static(path.join(__dirname, 'processed')));
-app.use(fileUpload({
-    limits: { fileSize: 3 * 1024 * 1024 * 1024 },
-    useTempFiles: true,
-    tempFileDir: '/tmp/',
-    //debug: true,
-    uploadTimeout: 3600000 // 30 минут в миллисекундах
-}));
-
-const uploadDir = path.join(__dirname, 'uploads');
-const processedDir = path.join(__dirname, 'processed');
-
-if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
-if (!fs.existsSync(processedDir)) fs.mkdirSync(processedDir, { recursive: true });
-
-// Очередь задач в памяти
-const jobQueue = [];
-let isProcessing = false;
-
-// Маршрут для обработки загрузки файлов и метаданных
-app.post('/upload', async (req, res) => {
-    try {
-        if (!req.files || Object.keys(req.files).length === 0) {
-            return res.status(400).send('No files were uploaded.');
-        }
-
-        // Извлекаем метаданные из req.body
-        const metadata = req.body;
-
-        // Генерируем уникальный идентификатор для этой задачи
-        const uniqueId = uuidv4();
-        const videoFile = req.files.file;
-
-        const safeFileName = path.basename(videoFile.name);
-        const inputPath = path.join(uploadDir, `${uniqueId}_${safeFileName}`);
-        const outputPath = path.join(processedDir, `${uniqueId}_${safeFileName}`);
-
-        // Перемещаем загруженный файл в директорию uploads
-        videoFile.mv(inputPath, function (err) {
-            if (err) {
-                console.error(`Error saving uploaded file: ${err}`);
-                return res.status(500).send(err);
-            }
-
-            // Создаём объект задачи и добавляем его в очередь
-            const job = {
-                id: uniqueId,
-                inputPath,
-                outputPath,
-                metadata,
-                status: 'queued',
-            };
-
-            jobQueue.push(job);
-            console.log(`Job ${uniqueId} added to the queue`);
-
-            // Запускаем обработку, если она не запущена
-            if (!isProcessing) {
-                processNextJob();
-            }
-
-            res.json({ uniqueId, message: 'Your video is added to the processing queue.' });
-        });
-    } catch (error) {
-        console.error(`Error in /upload route: ${error}`);
-        res.status(500).send('Server error');
-    }
+// Настройки подключения к Redis на основном сервере
+const redisClient = redis.createClient({
+    host: '203.0.113.10', // Замените на IP-адрес основного сервера
+    port: 6379,
+    // password: 'your_redis_password', // Если установлен пароль, раскомментируйте и укажите его
 });
+
+redisClient.on('error', (err) => {
+    console.error('Redis error:', err);
+});
+
+// Директории для временных файлов
+const tempDir = path.join(__dirname, 'temp');
+if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
 
 // Функция для обработки следующей задачи в очереди
 function processNextJob() {
-    if (jobQueue.length === 0) {
-        isProcessing = false;
-        return;
-    }
+    redisClient.lpop('video_jobs', async (err, jobData) => {
+        if (err) {
+            console.error('Error fetching job from Redis:', err);
+            setTimeout(processNextJob, 5000);
+            return;
+        }
 
-    isProcessing = true;
-    const job = jobQueue.shift();
+        if (!jobData) {
+            console.log('No jobs in the queue, waiting...');
+            setTimeout(processNextJob, 5000);
+            return;
+        }
 
-    console.log(`Starting processing job ${job.id}`);
+        const job = JSON.parse(jobData);
+        console.log(`Starting processing job ${job.id}`);
 
-    // Запускаем новый поток worker для обработки видео
-    const worker = new Worker(path.join(__dirname, 'videoProcessor.js'), {
-        workerData: { inputPath: job.inputPath, outputPath: job.outputPath }
-    });
+        try {
+            // Скачиваем видео с основного сервера
+            const inputFileUrl = `http://your_main_server_ip/uploads/${path.basename(job.inputPath)}`;
+            const localInputPath = path.join(tempDir, path.basename(job.inputPath));
 
-    worker.on('message', (result) => {
-        if (result.success) {
+            await downloadFile(inputFileUrl, localInputPath);
+
+            // Обработка видео (вызов videoProcessor.js)
+            const localOutputPath = path.join(tempDir, `processed_${path.basename(job.inputPath)}`);
+
+            await processVideo(localInputPath, localOutputPath);
+
+            // Загрузка обработанного видео в Google Cloud Storage
+            const videoUrl = await uploadToGoogleCloud(localOutputPath);
+
+            // Отправка метаданных и обновление статуса на основном сервере
+            await axios.post(`http://your_main_server_ip/update-job`, {
+                jobId: job.id,
+                status: 'processed',
+                metadata: job.metadata,
+                videoUrl: videoUrl,
+            });
+
+            // Удаление локальных файлов
+            fs.unlinkSync(localInputPath);
+            fs.unlinkSync(localOutputPath);
+
             console.log(`Job ${job.id} processed successfully`);
 
-            // TODO: Загрузка обработанного видео в Google Storage
-            // TODO: Отправка метаданных в базу данных
-            console.log(`Job ${job.id}: Uploading to Google Storage and sending metadata to database`);
-            // Здесь будет код для загрузки и работы с базой данных
-
-            // После завершения, обрабатываем следующую задачу
+            // Обработка следующей задачи
             processNextJob();
-        } else {
-            console.error(`Error processing job ${job.id}`);
-            // Опционально, обработка повторных попыток или логирование ошибок
+        } catch (error) {
+            console.error(`Error processing job ${job.id}:`, error);
 
-            // Переходим к следующей задаче
-            processNextJob();
-        }
-    });
+            // Возвращаем задачу в очередь для повторной попытки
+            redisClient.rpush('video_jobs', jobData, (err) => {
+                if (err) console.error('Error returning job to Redis:', err);
+            });
 
-    worker.on('error', (error) => {
-        console.error(`Worker error for job ${job.id}:`, error);
-
-        // Переходим к следующей задаче
-        processNextJob();
-    });
-
-    worker.on('exit', (code) => {
-        if (code !== 0) {
-            console.error(`Worker stopped with exit code ${code} for job ${job.id}`);
-            // Переходим к следующей задаче
-            processNextJob();
+            setTimeout(processNextJob, 5000);
         }
     });
 }
 
-// Эндпоинт для получения статуса очереди
-app.get('/queue-status', (req, res) => {
-    res.json({ queue_length: jobQueue.length + (isProcessing ? 1 : 0) });
-});
+// Функция для скачивания файла
+async function downloadFile(url, outputPath) {
+    const response = await axios({
+        url,
+        method: 'GET',
+        responseType: 'stream',
+    });
 
-// Обслуживание статических файлов (для фронтенда)
-app.use(express.static('public'));
+    const writer = fs.createWriteStream(outputPath);
 
+    return new Promise((resolve, reject) => {
+        response.data.pipe(writer);
+        let error = null;
+        writer.on('error', err => {
+            error = err;
+            writer.close();
+            reject(err);
+        });
+        writer.on('close', () => {
+            if (!error) {
+                resolve();
+            }
+        });
+    });
+}
 
-//const options = {
-//    key: fs.readFileSync('/etc/ssl/private/video-enhancer.key'),
-//    cert: fs.readFileSync('/etc/ssl/certs/video-enhancer.crt'),
-//  };
+// Функция для обработки видео
+async function processVideo(inputPath, outputPath) {
+    return new Promise((resolve, reject) => {
+        // Запускаем новый worker для обработки видео
+        const worker = new Worker(path.join(__dirname, 'videoProcessor.js'), {
+            workerData: { inputPath, outputPath }
+        });
 
+        worker.on('message', (result) => {
+            if (result.success) {
+                resolve();
+            } else {
+                reject(new Error('Video processing failed'));
+            }
+        });
 
-// Запуск сервера на указанном порту
-const PORT = 9090;
-const server = http.createServer(app);
+        worker.on('error', (error) => {
+            reject(error);
+        });
 
-// Устанавливаем таймаут для сервера (например, 10 минут)
-server.timeout = 3600000; // время в миллисекундах (600000 мс = 10 минут) 3600000 = 1 час
+        worker.on('exit', (code) => {
+            if (code !== 0) {
+                reject(new Error(`Worker stopped with exit code ${code}`));
+            }
+        });
+    });
+}
 
-server.headersTimeout = 4000000; // должно быть больше, чем server.timeout
-server.keepAliveTimeout = 4000000;
+// Функция для загрузки файла в Google Cloud Storage
+async function uploadToGoogleCloud(filePath) {
+    // Здесь реализуйте код для загрузки файла в Google Cloud Storage
+    // Верните URL загруженного видео
 
+    // Пример:
+    // const videoUrl = await uploadFileToGCS(bucketName, filePath);
+    // return videoUrl;
 
-server.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server started on http://0.0.0.0:${PORT}`);
-});
+    // Временно возвращаем фиктивный URL
+    return 'https://storage.googleapis.com/your_bucket/your_video.mp4';
+}
+
+// Запускаем обработку задач
+processNextJob();
