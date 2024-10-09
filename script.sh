@@ -156,6 +156,7 @@ if [ -z "$UFW_STATUS" ]; then
 fi
 
 sudo ufw allow $MINISITE_PORT
+sudo ufw allow 22/tcp
 sudo ufw reload
 
 echo_info "Настройка завершена. Вы можете запустить ваше Node.js приложение вручную командой:"
