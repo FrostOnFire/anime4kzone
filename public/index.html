@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Video Enhancer</title>
+    <!-- Подключаем стили и скрипты -->
+    <link href="https://unpkg.com/dropzone/dist/dropzone.css" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <h1>Video Enhancer</h1>
+
+    <!-- Форма для ввода данных -->
+    <form id="title-form">
+        <!-- Название аниме -->
+        <label for="title-input">Название аниме:</label>
+        <input type="text" id="title-input" name="title-input" autocomplete="off" required>
+        <ul id="suggestions" style="display: none;"></ul>
+
+        <!-- Номер эпизода -->
+        <label for="episode-input">Номер эпизода:</label>
+        <input type="number" id="episode-input" name="episode-input" disabled required>
+
+        <!-- Порядковый номер в хронологии -->
+        <label for="chronology-input">Порядковый номер в хронологии:</label>
+        <input type="number" id="chronology-input" name="chronology-input" disabled required>
+
+        <!-- Название франшизы -->
+        <label for="franchise-input">Название франшизы:</label>
+        <input type="text" id="franchise-input" name="franchise-input" disabled required>
+
+        <!-- Описание -->
+        <label for="description-input">Описание:</label>
+        <textarea id="description-input" name="description-input" rows="4" disabled></textarea>
+
+        <!-- Озвучка -->
+        <label for="voiceover-select">Озвучка:</label>
+        <select id="voiceover-select" name="voiceover-select" disabled required>
+            <option value="JAM">JAM</option>
+            <option value="AniLibria">AniLibria</option>
+            <option value="AniMaunt">AniMaunt</option>
+            <option value="Studio Band">Studio Band</option>
+            <option value="AnimeVost">AnimeVost</option>
+            <option value="AniDub">AniDub</option>
+            <option value="DreamCast">DreamCast</option>
+            <option value="Смешанный">Смешанный</option>
+            <!-- Добавьте другие варианты по необходимости -->
+        </select>
+
+        <!-- Начало опенинга -->
+        <label for="opening-start">Начало опенинга (мин:сек):</label>
+        <div>
+            <input type="number" id="opening-start-minutes" name="opening-start-minutes" min="0" disabled required> :
+            <input type="number" id="opening-start-seconds" name="opening-start-seconds" min="0" max="59" disabled required>
+        </div>
+
+        <!-- Конец опенинга -->
+        <label for="opening-end">Конец опенинга (мин:сек):</label>
+        <div>
+            <input type="number" id="opening-end-minutes" name="opening-end-minutes" min="0" disabled required> :
+            <input type="number" id="opening-end-seconds" name="opening-end-seconds" min="0" max="59" disabled required>
+        </div>
+    </form>
+
+    <div id="container">
+        <!-- Dropzone слева -->
+        <div id="dropzone-container">
+            <!-- Указываем action формы с полным URL сервера -->
+            <form action="{{UPLOAD_URL}}" class="dropzone disabled" id="video-dropzone"></form>
+        </div>
+
+        <!-- Изображение обложки справа -->
+        <div id="cover-container">
+            <img id="cover-image" src="" alt="Anime Cover" style="display: none;">
+        </div>
+    </div>
+
+    <!-- Дополнительные данные об аниме -->
+    <div id="anime-info">
+        <p>Жанры: <span id="genres"></span></p>
+        <p>Всего эпизодов: <span id="total-episodes">N/A</span></p>
+        <p>Рейтинг: <span id="rating">N/A</span></p>
+    </div>
+
+    <!-- Скрытые поля для хранения данных аниме -->
+    <input type="hidden" id="anime-id" name="anime-id">
+    <input type="hidden" id="anime-title" name="anime-title">
+    <input type="hidden" id="anime-cover" name="anime-cover">
+
+    <!-- Кнопка отправки -->
+    <button id="submit-btn" disabled>Отправить</button>
+
+    <!-- Секция для сообщений -->
+    <p id="queue-status"></p>
+    <p id="log"></p>
+    <p id="error"></p>
+
+    <!-- Подключение скриптов -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dropzone/5.7.0/dropzone.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
