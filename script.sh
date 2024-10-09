@@ -113,7 +113,7 @@ fi
 
 # Создание URL для UPLOAD_URL и SERVER_URL
 UPLOAD_URL="http://$EXTERNAL_IP:$MINISITE_PORT/upload"
-SERVER_URL="http://$EXTERNAL_IP:$MINISITE_PORT"
+SERVER_URL="http://$EXTERNAL_IP:9090"
 
 echo_info "Обновление index.html с актуальным UPLOAD_URL..."
 # Замена UPLOAD_URL в index.html
