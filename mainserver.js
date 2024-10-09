@@ -87,6 +87,9 @@ app.post('/upload', async (req, res) => {
                 return res.status(500).send(err);
             }
 
+            // Добавляем путь к входному файлу в метаданные
+            metadata.inputPath = inputPath;
+
             // Создаём объект задачи
             const job = {
                 id: uniqueId,
@@ -109,6 +112,18 @@ app.post('/upload', async (req, res) => {
         console.error(`Error in /upload route: ${error}`);
         res.status(500).send('Server error');
     }
+});
+
+// **Маршрут для получения статуса очереди**
+app.get('/queue-status', (req, res) => {
+    redisClient.llen('video_jobs', (err, length) => {
+        if (err) {
+            console.error('Error getting queue length:', err);
+            return res.status(500).json({ error: 'Error getting queue length' });
+        }
+
+        res.json({ queue_length: length });
+    });
 });
 
 // Маршрут для обновления информации о задаче после обработки

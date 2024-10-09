@@ -84,10 +84,10 @@ sudo ln -sf /etc/nginx/sites-available/anime4kzone.conf /etc/nginx/sites-enabled
 sudo nginx -t
 sudo systemctl restart nginx
 
-echo_info "Получение внешнего IP адреса сервера..."
-EXTERNAL_IP=$(curl -s ifconfig.me)
+echo_info "Получение внешнего IPv4 адреса сервера..."
+EXTERNAL_IP=$(curl -4 -s ifconfig.me)
 if [ -z "$EXTERNAL_IP" ]; then
-    echo_error "Не удалось получить внешний IP адрес."
+    echo_error "Не удалось получить внешний IPv4 адрес."
     exit 1
 fi
 
@@ -147,6 +147,14 @@ sed -i "s|origin: '{{CLIENT_URL}}'|origin: '$CLIENT_URL'|g" "$SERVER_JS_PATH"
 echo_info "Файл mainserver.js обновлён с новым CLIENT_URL."
 
 echo_info "Открытие порта $MINISITE_PORT в брандмауэре..."
+# Проверяем, активирован ли ufw
+UFW_STATUS=$(sudo ufw status | grep -o "Status: active" || true)
+
+if [ -z "$UFW_STATUS" ]; then
+    echo_info "Брандмауэр UFW не активирован. Активируем UFW..."
+    sudo ufw enable
+fi
+
 sudo ufw allow $MINISITE_PORT
 sudo ufw reload
 
