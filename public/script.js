@@ -21,6 +21,11 @@ const submitBtn = document.getElementById('submit-btn');
 const logElement = document.getElementById('log');
 const errorElement = document.getElementById('error');
 const queueStatusElement = document.getElementById('queue-status');
+const coverLoadingElement = document.getElementById('cover-loading'); // Элемент для индикатора загрузки
+
+// Переменная для хранения обложки
+let coverFile = null;
+let currentCoverAbortController = null; // Для отмены предыдущего запроса
 
 episodeInput.disabled = true;
 chronologyInput.disabled = true;
@@ -32,14 +37,16 @@ openingEndMinutes.disabled = true;
 openingEndSeconds.disabled = true;
 voiceoverSelect.disabled = true;
 
+// Удаляет ненужные теги из текста
 function removeCharacterTags(text) {
     return text
-        .replace(/\[.*?\]/g, '')  // Remove any content within square brackets
-        .replace(/[\[\]]/g, '')   // Remove any remaining [ or ] characters
-        .replace(/\s+([,.!?])/g, '$1')  // Remove space before punctuation
+        .replace(/\[.*?\]/g, '')  // Удалить содержимое в квадратных скобках
+        .replace(/[\[\]]/g, '')   // Удалить оставшиеся [ и ]
+        .replace(/\s+([,.!?])/g, '$1')  // Удалить пробел перед пунктуацией
         .trim();
 }
 
+// Очищает данные франшизы
 function cleanFranchiseData(franchiseDetails) {
     return franchiseDetails.nodes ? franchiseDetails.nodes.map(anime => ({
         id: anime.id,
@@ -48,14 +55,17 @@ function cleanFranchiseData(franchiseDetails) {
     })) : [];
 }
 
+// Получает название франшизы или использует fallback
 function getFranchiseTitle(sortedFranchise, fallbackTitle) {
     return sortedFranchise.length > 0 ? sortedFranchise[0].title : fallbackTitle;  
 }
 
+// Получает номер хроники
 function getChronologyNumber(sortedFranchise, selectedAnimeId) {
     return sortedFranchise.length > 0 ? sortedFranchise.findIndex(anime => anime.id === selectedAnimeId) + 1 : 1;  
 }
 
+// Обработчик ввода для поля названия
 titleInput.addEventListener('input', function () {
     const query = this.value;
 
@@ -70,6 +80,9 @@ titleInput.addEventListener('input', function () {
                     const suggestionItem = document.createElement('li');
                     suggestionItem.textContent = anime.russian;
                     suggestionItem.addEventListener('click', function () {
+                        // При выборе нового аниме, сбрасываем предыдущие данные
+                        resetCover();
+
                         titleInput.value = anime.russian;
                         suggestions.style.display = 'none';
 
@@ -125,7 +138,11 @@ titleInput.addEventListener('input', function () {
                                 checkFormValidity();
                             });
 
-                        coverImage.src = `https://shikimori.one${anime.image.original}`;
+                        // Устанавливаем URL обложки через прокси-эндпоинт
+                        const coverUrl = `https://shikimori.one${anime.image.original}`;
+                        const proxyCoverUrl = `${SERVER_URL}/proxy-cover?url=${encodeURIComponent(coverUrl)}`;
+
+                        coverImage.src = proxyCoverUrl;
                         coverImage.style.display = 'block';
 
                         dropzoneElement.classList.remove('disabled');
@@ -142,6 +159,8 @@ titleInput.addEventListener('input', function () {
                             checkFormValidity();
                         });
 
+                        // Автоматическая загрузка обложки через прокси
+                        downloadCoverImage(coverUrl);
                         checkFormValidity();
                     });
                     suggestions.appendChild(suggestionItem);
@@ -153,6 +172,75 @@ titleInput.addEventListener('input', function () {
     }
 });
 
+// Функция для сброса предыдущей обложки
+function resetCover() {
+    // Отмена предыдущего запроса, если он существует
+    if (currentCoverAbortController) {
+        currentCoverAbortController.abort();
+        currentCoverAbortController = null;
+    }
+
+    // Сброс переменной coverFile
+    coverFile = null;
+
+    // Скрытие обложки в UI
+    coverImage.src = '';
+    coverImage.style.display = 'none';
+
+    // Скрытие индикатора загрузки, если он существует
+    if (coverLoadingElement) {
+        coverLoadingElement.style.display = 'none';
+    }
+}
+
+// Функция для скачивания обложки через прокси и преобразования её в файл
+function downloadCoverImage(url) {
+    // Показываем индикатор загрузки
+    if (coverLoadingElement) {
+        coverLoadingElement.style.display = 'block';
+    }
+
+    // Если уже идет загрузка, отменяем её
+    if (currentCoverAbortController) {
+        currentCoverAbortController.abort();
+    }
+
+    currentCoverAbortController = new AbortController();
+    const signal = currentCoverAbortController.signal;
+
+    // Используем прокси-эндпоинт вашего сервера
+    const proxyUrl = `${SERVER_URL}/proxy-cover?url=${encodeURIComponent(url)}`;
+
+    fetch(proxyUrl, { signal })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.blob();
+        })
+        .then(blob => {
+            const filename = url.split('/').pop().split('?')[0] || 'cover.jpg';
+            coverFile = new File([blob], filename, { type: blob.type });
+            console.log(`Cover image size: ${coverFile.size} bytes`);
+            // Вы можете также отобразить размер в интерфейсе, если необходимо
+        })
+        .catch(error => {
+            if (error.name === 'AbortError') {
+                console.log('Previous cover image download aborted.');
+            } else {
+                console.error('Error downloading cover image:', error);
+            }
+        })
+        .finally(() => {
+            currentCoverAbortController = null;
+            // Скрываем индикатор загрузки
+            if (coverLoadingElement) {
+                coverLoadingElement.style.display = 'none';
+            }
+        });
+}
+
+// Функция для расчёта конца открытия
 function calculateOpeningEnd() {
     const startMinutes = parseInt(openingStartMinutes.value) || 0;
     const startSeconds = parseInt(openingStartSeconds.value) || 0;
@@ -170,6 +258,7 @@ function calculateOpeningEnd() {
     checkFormValidity();
 }
 
+// Функция для проверки валидности формы
 function checkFormValidity() {
     const isTitleFilled = titleInput.value.trim() !== '';
     const isEpisodeFilled = episodeInput.value.trim() !== '';
@@ -198,19 +287,21 @@ function checkFormValidity() {
     } else {
       submitBtn.disabled = true;
     }
-  }
+}
 
+// Настройка Dropzone для загрузки видео
 Dropzone.options.videoDropzone = {
     url: `${SERVER_URL}/upload`,
-    maxFilesize: 3072,
+    maxFilesize: 3072, // 3 GB
     acceptedFiles: ".mp4,.avi,.mov",
     autoProcessQueue: false,
     maxFiles: 1,
     addRemoveLinks: true,
-    timeout: 3600000,
+    timeout: 3600000, // 1 час
     init: function () {
         const myDropzone = this;
 
+        // Обработчик клика по кнопке отправки
         submitBtn.addEventListener('click', function (e) {
             e.preventDefault();
             e.stopPropagation();
@@ -222,16 +313,19 @@ Dropzone.options.videoDropzone = {
             }
         });
 
+        // Обработчик добавления файла
         this.on("addedfile", function (file) {
             console.log('File added:', file.name);
             checkFormValidity();
         });
 
+        // Обработчик удаления файла
         this.on("removedfile", function (file) {
             console.log('File removed:', file.name);
             checkFormValidity();
         });
 
+        // Обработчик отправки файла
         this.on("sending", function (file, xhr, formData) {
             formData.append("anime_id", document.getElementById('anime-id').value);
             formData.append("anime_title", document.getElementById('anime-title').value);
@@ -241,19 +335,28 @@ Dropzone.options.videoDropzone = {
             formData.append("chronology", chronologyInput.value);
             formData.append("description", descriptionInput.value);
             formData.append("voiceover", voiceoverSelect.value);
+            formData.append("franchise", franchiseInput.value); // Добавлено поле franchise
 
             const openingStartTime = parseInt(openingStartMinutes.value) * 60 + parseInt(openingStartSeconds.value);
             const openingEndTime = parseInt(openingEndMinutes.value) * 60 + parseInt(openingEndSeconds.value);
             formData.append("opening_start", openingStartTime);
             formData.append("opening_end", openingEndTime);
+
+            // Добавляем файл обложки, если он существует
+            if (coverFile) {
+                formData.append("cover_file", coverFile);
+                console.log(`Cover file size: ${coverFile.size} bytes`);
+            }
         });
 
+        // Обработчик успешной загрузки
         this.on("success", function (file, response) {
             logElement.textContent = response.message || "Video uploaded successfully!";
             myDropzone.removeFile(file);
             resetForm();
         });
 
+        // Обработчик ошибок загрузки
         this.on("error", function (file, response) {
             console.error('Error uploading file:', response);
             let message = '';
@@ -273,6 +376,7 @@ Dropzone.options.videoDropzone = {
     }
 };
 
+// Функция для сброса формы
 function resetForm() {
     titleInput.value = '';
     episodeInput.value = '';
@@ -314,11 +418,20 @@ function resetForm() {
 
     logElement.textContent = '';
     errorElement.textContent = '';
+
+    // Сброс coverFile и отмена предыдущего запроса
+    resetCover();
 }
 
+// Функция для получения статуса очереди
 function getQueueStatus() {
     fetch(`${SERVER_URL}/queue-status`)
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
     .then(data => {
         queueStatusElement.textContent = `Videos in queue: ${data.queue_length}`;
     })
@@ -327,12 +440,13 @@ function getQueueStatus() {
     });
 }
 
+// Запуск функций после загрузки документа
 document.addEventListener('DOMContentLoaded', function() {
     getQueueStatus();
     setInterval(getQueueStatus, 5000);
 });
 
-// Add event listeners to input fields
+// Добавление обработчиков событий для полей ввода
 titleInput.addEventListener('input', checkFormValidity);
 episodeInput.addEventListener('input', function() {
     if (episodeInput.value > 0) {

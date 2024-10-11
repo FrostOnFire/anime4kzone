@@ -6,6 +6,75 @@
     <!-- Подключаем стили и скрипты -->
     <link href="https://unpkg.com/dropzone/dist/dropzone.css" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
+    <style>
+        /* Дополнительные стили для лучшего отображения */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        #container {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+        }
+        #dropzone-container, #cover-container {
+            width: 48%;
+        }
+        #cover-container {
+            text-align: center;
+        }
+        #cover-image {
+            max-width: 100%;
+            height: auto;
+        }
+        #cover-loading {
+            color: blue;
+            font-weight: bold;
+        }
+        #suggestions {
+            border: 1px solid #ccc;
+            max-height: 150px;
+            overflow-y: auto;
+            position: absolute;
+            background-color: white;
+            width: calc(100% - 22px); /* Adjust based on input padding */
+            z-index: 1000;
+            list-style: none;
+            padding: 0;
+            margin-top: 0;
+        }
+        #suggestions li {
+            padding: 8px;
+            cursor: pointer;
+        }
+        #suggestions li:hover {
+            background-color: #f0f0f0;
+        }
+        form label {
+            display: block;
+            margin-top: 10px;
+        }
+        form input, form textarea, form select {
+            width: 100%;
+            padding: 8px;
+            margin-top: 5px;
+            box-sizing: border-box;
+        }
+        button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            font-size: 16px;
+        }
+        #anime-info p {
+            margin: 5px 0;
+        }
+        #log {
+            color: green;
+        }
+        #error {
+            color: red;
+        }
+    </style>
 </head>
 <body>
     <h1>Video Enhancer</h1>
@@ -36,7 +105,7 @@
         <!-- Озвучка -->
         <label for="voiceover-select">Озвучка:</label>
         <select id="voiceover-select" name="voiceover-select" disabled required>
-            <option value="Выбери озвучку">JAM</option>
+            <option value="">Выберите озвучку</option>
             <option value="JAM">JAM</option>
             <option value="AniLibria">AniLibria</option>
             <option value="AniMaunt">AniMaunt</option>
@@ -62,12 +131,12 @@
             <input type="number" id="opening-end-seconds" name="opening-end-seconds" min="0" max="59" disabled required>
         </div>
     </form>
-
+    
     <div id="container">
         <!-- Dropzone слева -->
         <div id="dropzone-container">
             <!-- Указываем action формы с полным URL сервера -->
-            <form action="http://203.0.113.10:8080/upload" class="dropzone disabled" id="video-dropzone"></form>
+            <form action="http://203.0.113.10:9090/upload" class="dropzone disabled" id="video-dropzone"></form>
         </div>
 
         <!-- Изображение обложки справа -->
@@ -75,7 +144,7 @@
             <img id="cover-image" src="" alt="Anime Cover" style="display: none;">
         </div>
     </div>
-
+    <p id="cover-loading" style="display: none;">Загрузка обложки...</p>
     <!-- Дополнительные данные об аниме -->
     <div id="anime-info">
         <p>Жанры: <span id="genres"></span></p>

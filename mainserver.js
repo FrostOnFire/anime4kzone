@@ -9,16 +9,16 @@ const http = require('http');
 const { v4: uuidv4 } = require('uuid');
 const redis = require('redis');
 const { Pool } = require('pg');
-const debug = require('debug')('mainserver'); // Для отладки
+const fetch = require('node-fetch'); // Используем node-fetch версии 2
 
-require('dotenv').config(); // Используется для загрузки переменных окружения из файла .env
+require('dotenv').config(); // Загружает переменные окружения из .env файла
 
 const app = express();
 app.set('trust proxy', true);
 
 // Настройка CORS
 app.use(cors({
-    origin: 'http://203.0.113.10:8080', // Замените на URL вашего клиента
+    origin: 'http://203.0.113.10:8080', // Замените на фактический URL вашего клиента
     credentials: true
 }));
 
@@ -47,7 +47,12 @@ redisClient.on('connect', () => {
 
 // Асинхронное подключение к Redis
 (async () => {
-    await redisClient.connect();
+    try {
+        await redisClient.connect();
+        console.log('Redis client connected');
+    } catch (err) {
+        console.error('Redis connection error:', err);
+    }
 })();
 
 // Подключение к базе данных PostgreSQL
@@ -75,6 +80,39 @@ app.use(fileUpload({
     uploadTimeout: 3600000 // Таймаут загрузки (1 час)
 }));
 
+// Маршрут для проксирования запросов к обложкам
+app.get('/proxy-cover', async (req, res) => {
+    const imageUrl = req.query.url;
+    if (!imageUrl) {
+        return res.status(400).json({ error: 'No URL provided' });
+    }
+
+    try {
+        // Валидация хоста
+        const urlObject = new URL(imageUrl);
+        if (urlObject.hostname !== 'shikimori.one') {
+            return res.status(400).json({ error: 'Invalid host' });
+        }
+
+        const response = await fetch(imageUrl);
+        if (!response.ok) {
+            return res.status(response.status).json({ error: 'Error fetching image' });
+        }
+
+        const contentType = response.headers.get('content-type');
+        res.set('Content-Type', contentType);
+
+        // Разрешаем CORS для вашего клиента
+        res.set('Access-Control-Allow-Origin', 'http://203.0.113.10:8080');
+
+        // Потоковая передача данных
+        response.body.pipe(res);
+    } catch (error) {
+        console.error('Error in /proxy-cover:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
 // Маршрут для загрузки файлов и добавления задач в Redis
 app.post('/upload', async (req, res) => {
     console.log('Received /upload request');
@@ -91,39 +129,44 @@ app.post('/upload', async (req, res) => {
         // Генерируем уникальный идентификатор для задачи
         const uniqueId = uuidv4();
         const videoFile = req.files.file;
+        const coverFile = req.files.cover_file; // Получаем файл обложки, если он был загружен
 
-        const safeFileName = path.basename(videoFile.name);
-        const inputPath = path.join(uploadDir, `${uniqueId}_${safeFileName}`);
+        const safeVideoFileName = path.basename(videoFile.name);
+        const inputPath = path.join(uploadDir, `${uniqueId}_${safeVideoFileName}`);
 
-        // Сохраняем загруженный файл
-        console.log(`Saving uploaded file to ${inputPath}`);
-        videoFile.mv(inputPath, async function (err) {
-            if (err) {
-                console.error(`Error saving uploaded file: ${err}`);
-                return res.status(500).send(err);
-            }
+        let coverPath = null;
+        if (coverFile) {
+            const safeCoverFileName = path.basename(coverFile.name);
+            coverPath = path.join(uploadDir, `${uniqueId}_cover_${safeCoverFileName}`);
 
-            // Добавляем путь к входному файлу в метаданные
-            metadata.inputPath = inputPath;
+            // Сохраняем обложку на сервере
+            await coverFile.mv(coverPath);
+            console.log(`Cover image saved to ${coverPath}`);
+            console.log(`Cover file size: ${coverFile.size} bytes`);
+        }
 
-            // Создаём объект задачи
-            const job = {
-                id: uniqueId,
-                inputPath,
-                metadata,
-            };
+        // Сохраняем загруженный видео файл
+        await videoFile.mv(inputPath);
+        console.log(`Video file saved to ${inputPath}`);
 
-            // Добавляем задачу в Redis
-            console.log(`Adding job ${uniqueId} to Redis queue`);
-            try {
-                await redisClient.RPUSH('video_jobs', JSON.stringify(job));
-                console.log(`Job ${uniqueId} added to the Redis queue`);
-                res.json({ uniqueId, message: 'Your video is added to the processing queue.' });
-            } catch (err) {
-                console.error('Error adding job to Redis:', err);
-                return res.status(500).send('Server error');
-            }
-        });
+        // Добавляем путь к входному файлу в метаданные
+        metadata.inputPath = inputPath;
+
+        if (coverPath) {
+            metadata.coverPath = coverPath; // Добавляем путь к обложке в метаданные
+        }
+
+        // Создаём объект задачи
+        const job = {
+            id: uniqueId,
+            inputPath,
+            metadata,
+        };
+
+        // Добавляем задачу в Redis
+        await redisClient.RPUSH('video_jobs', JSON.stringify(job));
+        console.log(`Job ${uniqueId} added to the Redis queue`);
+        res.json({ uniqueId, message: 'Your video is added to the processing queue.' });
     } catch (error) {
         console.error(`Error in /upload route: ${error}`);
         res.status(500).send('Server error');
@@ -215,6 +258,12 @@ app.post('/update-job', async (req, res) => {
             ]
         );
         console.log(`Saved video information for job ID ${jobId}`);
+
+        // Опционально: Сохранение обложки на сервере или в облаке
+        if (metadata.coverPath) {
+            console.log(`Cover image available at: ${metadata.coverPath}`);
+            // Здесь вы можете добавить логику для перемещения обложки в другое место или загрузки её в облако
+        }
 
         // Удаляем исходный файл после успешной обработки
         const inputFilePath = metadata.inputPath;
