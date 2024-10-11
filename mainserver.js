@@ -18,7 +18,7 @@ app.set('trust proxy', true);
 
 // Настройка CORS
 app.use(cors({
-    origin: '{{CLIENT_URL}}', // Замените на URL вашего клиента
+    origin: 'http://203.0.113.10:8080', // Замените на URL вашего клиента
     credentials: true
 }));
 
