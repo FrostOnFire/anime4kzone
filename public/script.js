@@ -21,9 +21,8 @@ const submitBtn = document.getElementById('submit-btn');
 const logElement = document.getElementById('log');
 const errorElement = document.getElementById('error');
 const queueStatusElement = document.getElementById('queue-status');
-const coverLoadingElement = document.getElementById('cover-loading'); // Элемент для индикатора загрузки
+const coverLoadingElement = document.getElementById('cover-loading');
 
-// Переменная для хранения обложки
 let coverFile = null;
 let currentCoverAbortController = null; // Для отмены предыдущего запроса
 
@@ -37,7 +36,7 @@ openingEndMinutes.disabled = true;
 openingEndSeconds.disabled = true;
 voiceoverSelect.disabled = true;
 
-// Удаляет ненужные теги из текста
+// Функция для удаления тегов из описания
 function removeCharacterTags(text) {
     return text
         .replace(/\[.*?\]/g, '')  // Удалить содержимое в квадратных скобках
@@ -46,7 +45,7 @@ function removeCharacterTags(text) {
         .trim();
 }
 
-// Очищает данные франшизы
+// Функция для очистки данных франшизы
 function cleanFranchiseData(franchiseDetails) {
     return franchiseDetails.nodes ? franchiseDetails.nodes.map(anime => ({
         id: anime.id,
@@ -55,17 +54,17 @@ function cleanFranchiseData(franchiseDetails) {
     })) : [];
 }
 
-// Получает название франшизы или использует fallback
+// Функция для получения названия франшизы
 function getFranchiseTitle(sortedFranchise, fallbackTitle) {
     return sortedFranchise.length > 0 ? sortedFranchise[0].title : fallbackTitle;  
 }
 
-// Получает номер хроники
+// Функция для получения порядкового номера в хронологии
 function getChronologyNumber(sortedFranchise, selectedAnimeId) {
     return sortedFranchise.length > 0 ? sortedFranchise.findIndex(anime => anime.id === selectedAnimeId) + 1 : 1;  
 }
 
-// Обработчик ввода для поля названия
+// Обработчик ввода в поле названия аниме
 titleInput.addEventListener('input', function () {
     const query = this.value;
 
@@ -138,7 +137,7 @@ titleInput.addEventListener('input', function () {
                                 checkFormValidity();
                             });
 
-                        // Устанавливаем URL обложки через прокси-эндпоинт
+                        // Используем прокси-эндпоинт для отображения обложки
                         const coverUrl = `https://shikimori.one${anime.image.original}`;
                         const proxyCoverUrl = `${SERVER_URL}/proxy-cover?url=${encodeURIComponent(coverUrl)}`;
 
@@ -161,6 +160,7 @@ titleInput.addEventListener('input', function () {
 
                         // Автоматическая загрузка обложки через прокси
                         downloadCoverImage(coverUrl);
+
                         checkFormValidity();
                     });
                     suggestions.appendChild(suggestionItem);
@@ -183,22 +183,16 @@ function resetCover() {
     // Сброс переменной coverFile
     coverFile = null;
 
-    // Скрытие обложки в UI
+    // Скрытие обложки и индикатора загрузки в UI
     coverImage.src = '';
     coverImage.style.display = 'none';
-
-    // Скрытие индикатора загрузки, если он существует
-    if (coverLoadingElement) {
-        coverLoadingElement.style.display = 'none';
-    }
+    coverLoadingElement.style.display = 'none';
 }
 
-// Функция для скачивания обложки через прокси и преобразования её в файл
+// Функция для скачивания обложки и преобразования её в файл
 function downloadCoverImage(url) {
     // Показываем индикатор загрузки
-    if (coverLoadingElement) {
-        coverLoadingElement.style.display = 'block';
-    }
+    coverLoadingElement.style.display = 'block';
 
     // Если уже идет загрузка, отменяем её
     if (currentCoverAbortController) {
@@ -229,18 +223,17 @@ function downloadCoverImage(url) {
                 console.log('Previous cover image download aborted.');
             } else {
                 console.error('Error downloading cover image:', error);
+                errorElement.textContent = `Error downloading cover image: ${error.message}`;
             }
         })
         .finally(() => {
             currentCoverAbortController = null;
             // Скрываем индикатор загрузки
-            if (coverLoadingElement) {
-                coverLoadingElement.style.display = 'none';
-            }
+            coverLoadingElement.style.display = 'none';
         });
 }
 
-// Функция для расчёта конца открытия
+// Функция для расчёта конца опенинга
 function calculateOpeningEnd() {
     const startMinutes = parseInt(openingStartMinutes.value) || 0;
     const startSeconds = parseInt(openingStartSeconds.value) || 0;
@@ -289,7 +282,7 @@ function checkFormValidity() {
     }
 }
 
-// Настройка Dropzone для загрузки видео
+// Настройки Dropzone
 Dropzone.options.videoDropzone = {
     url: `${SERVER_URL}/upload`,
     maxFilesize: 3072, // 3 GB
@@ -301,7 +294,7 @@ Dropzone.options.videoDropzone = {
     init: function () {
         const myDropzone = this;
 
-        // Обработчик клика по кнопке отправки
+        // Обработчик нажатия на кнопку отправки
         submitBtn.addEventListener('click', function (e) {
             e.preventDefault();
             e.stopPropagation();
@@ -313,19 +306,17 @@ Dropzone.options.videoDropzone = {
             }
         });
 
-        // Обработчик добавления файла
+        // Обработчики событий Dropzone
         this.on("addedfile", function (file) {
             console.log('File added:', file.name);
             checkFormValidity();
         });
 
-        // Обработчик удаления файла
         this.on("removedfile", function (file) {
             console.log('File removed:', file.name);
             checkFormValidity();
         });
 
-        // Обработчик отправки файла
         this.on("sending", function (file, xhr, formData) {
             formData.append("anime_id", document.getElementById('anime-id').value);
             formData.append("anime_title", document.getElementById('anime-title').value);
@@ -349,14 +340,12 @@ Dropzone.options.videoDropzone = {
             }
         });
 
-        // Обработчик успешной загрузки
         this.on("success", function (file, response) {
             logElement.textContent = response.message || "Video uploaded successfully!";
             myDropzone.removeFile(file);
             resetForm();
         });
 
-        // Обработчик ошибок загрузки
         this.on("error", function (file, response) {
             console.error('Error uploading file:', response);
             let message = '';
@@ -376,7 +365,7 @@ Dropzone.options.videoDropzone = {
     }
 };
 
-// Функция для сброса формы
+// Функция для сброса формы после успешной отправки
 function resetForm() {
     titleInput.value = '';
     episodeInput.value = '';
@@ -389,6 +378,8 @@ function resetForm() {
     franchiseInput.value = '';
     chronologyInput.value = '';
     coverImage.style.display = 'none';
+    coverImage.src = '';
+    coverLoadingElement.style.display = 'none';
     genresElement.textContent = '';
     ratingElement.textContent = 'N/A';
     totalEpisodesElement.textContent = 'N/A';
@@ -440,13 +431,13 @@ function getQueueStatus() {
     });
 }
 
-// Запуск функций после загрузки документа
+// Запуск функции получения статуса очереди при загрузке страницы и каждые 5 секунд
 document.addEventListener('DOMContentLoaded', function() {
     getQueueStatus();
     setInterval(getQueueStatus, 5000);
 });
 
-// Добавление обработчиков событий для полей ввода
+// Добавление обработчиков событий для проверки валидности формы
 titleInput.addEventListener('input', checkFormValidity);
 episodeInput.addEventListener('input', function() {
     if (episodeInput.value > 0) {
