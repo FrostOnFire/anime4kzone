@@ -7,41 +7,23 @@
     <link href="https://unpkg.com/dropzone/dist/dropzone.css" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
     <style>
-        /* Дополнительные стили для лучшего отображения */
-        body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-        }
-        #container {
-            display: flex;
-            justify-content: space-between;
-            margin-top: 20px;
-        }
-        #dropzone-container, #cover-container {
-            width: 48%;
-        }
-        #cover-container {
-            text-align: center;
-        }
-        #cover-image {
-            max-width: 100%;
-            height: auto;
-        }
+        /* Пример простого стиля для индикатора загрузки */
         #cover-loading {
             color: blue;
             font-weight: bold;
+            margin-top: 10px;
         }
         #suggestions {
             border: 1px solid #ccc;
             max-height: 150px;
             overflow-y: auto;
             position: absolute;
-            background-color: white;
-            width: calc(100% - 22px); /* Adjust based on input padding */
-            z-index: 1000;
+            background: white;
+            width: 300px;
             list-style: none;
             padding: 0;
-            margin-top: 0;
+            margin: 0;
+            z-index: 1000;
         }
         #suggestions li {
             padding: 8px;
@@ -50,29 +32,42 @@
         #suggestions li:hover {
             background-color: #f0f0f0;
         }
+        /* Дополнительные стили по необходимости */
+        #container {
+            display: flex;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        #dropzone-container, #cover-container {
+            flex: 1;
+        }
+        #cover-image {
+            max-width: 100%;
+            height: auto;
+        }
         form label {
             display: block;
             margin-top: 10px;
         }
-        form input, form textarea, form select {
+        form input, form select, form textarea {
             width: 100%;
             padding: 8px;
-            margin-top: 5px;
             box-sizing: border-box;
         }
         button {
             margin-top: 20px;
             padding: 10px 20px;
-            font-size: 16px;
         }
         #anime-info p {
             margin: 5px 0;
         }
-        #log {
-            color: green;
-        }
         #error {
             color: red;
+            font-weight: bold;
+        }
+        #log {
+            color: green;
+            font-weight: bold;
         }
     </style>
 </head>
@@ -80,10 +75,10 @@
     <h1>Video Enhancer</h1>
 
     <!-- Форма для ввода данных -->
-    <form id="title-form">
+    <form id="title-form" autocomplete="off">
         <!-- Название аниме -->
         <label for="title-input">Название аниме:</label>
-        <input type="text" id="title-input" name="title-input" autocomplete="off" required>
+        <input type="text" id="title-input" name="title-input" required>
         <ul id="suggestions" style="display: none;"></ul>
 
         <!-- Номер эпизода -->

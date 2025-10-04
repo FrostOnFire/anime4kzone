@@ -1,5 +1,5 @@
 // mainserver.js
-
+const { getAccessToken } = require('./shikimoriTokenManager');
 const express = require('express');
 const fileUpload = require('express-fileupload');
 const path = require('path');
@@ -79,6 +79,55 @@ app.use(fileUpload({
     tempFileDir: '/tmp/',
     uploadTimeout: 3600000 // Таймаут загрузки (1 час)
 }));
+
+
+app.get('/get-high-quality-cover', async (req, res) => {
+    const animeId = req.query.id;
+    if (!animeId) {
+      return res.status(400).json({ error: 'No anime ID provided' });
+    }
+  
+    try {
+      // Получаем актуальный токен доступа
+      const accessToken = await getAccessToken();
+  
+      const query = `
+        query ($id: ID!) {
+          anime(id: $id) {
+            images {
+              maximum
+              original
+            }
+          }
+        }
+      `;
+  
+      const variables = { id: animeId };
+  
+      const response = await fetch('https://shikimori.one/api/graphql', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'YourAppName/1.0 (your-email@example.com)',
+          'Authorization': `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ query, variables }),
+      });
+  
+      const data = await response.json();
+  
+      if (data && data.data && data.data.anime && data.data.anime.images) {
+        const coverUrl = data.data.anime.images.maximum || data.data.anime.images.original;
+        res.json({ coverUrl });
+      } else {
+        res.status(404).json({ error: 'Cover image not found' });
+      }
+    } catch (error) {
+      console.error('Error fetching high-quality cover:', error);
+      res.status(500).json({ error: 'Internal Server Error' });
+    }
+  });
+
 
 // Маршрут для проксирования запросов к обложкам
 app.get('/proxy-cover', async (req, res) => {

@@ -79,16 +79,18 @@ titleInput.addEventListener('input', function () {
                     const suggestionItem = document.createElement('li');
                     suggestionItem.textContent = anime.russian;
                     suggestionItem.addEventListener('click', function () {
+                        // Сброс полей аниме
+                        resetAnimeFields();
                         // При выборе нового аниме, сбрасываем предыдущие данные
                         resetCover();
-
+                    
                         titleInput.value = anime.russian;
                         suggestions.style.display = 'none';
-
+                    
                         document.getElementById('anime-id').value = anime.id;
                         document.getElementById('anime-title').value = anime.russian;
                         document.getElementById('anime-cover').value = anime.image.original;
-
+                    
                         fetch(`https://shikimori.one/api/animes/${anime.id}`)
                             .then(response => response.json())
                             .then(details => {
@@ -98,30 +100,30 @@ titleInput.addEventListener('input', function () {
                                 } else {
                                     genresElement.textContent = '';  
                                 }
-
+                    
                                 const totalEpisodes = details.episodes || 'N/A';
                                 totalEpisodesElement.textContent = totalEpisodes;  
-
+                    
                                 episodeInput.disabled = false;
                                 episodeInput.max = totalEpisodes;
                                 episodeInput.placeholder = `Enter episode number (1-${totalEpisodes})`;
-
+                    
                                 if (details.description) {
                                     descriptionInput.value = removeCharacterTags(details.description);
                                 }
                                 descriptionInput.disabled = false;
-
+                    
                                 ratingElement.textContent = details.score ? details.score : 'N/A';  
-
+                    
                                 fetch(`https://shikimori.one/api/animes/${anime.id}/franchise`)
                                     .then(response => response.json())
                                     .then(franchiseDetails => {
                                         const sortedFranchise = cleanFranchiseData(franchiseDetails).sort((a, b) => a.date - b.date);
-
+                    
                                         const franchiseTitle = getFranchiseTitle(sortedFranchise, anime.russian);
                                         franchiseInput.value = franchiseTitle;
                                         franchiseInput.disabled = false;
-
+                    
                                         const chronologyNumber = getChronologyNumber(sortedFranchise, anime.id);
                                         chronologyInput.value = chronologyNumber;
                                         chronologyInput.disabled = false;
@@ -132,23 +134,40 @@ titleInput.addEventListener('input', function () {
                                         chronologyInput.disabled = false;
                                         console.error('Error fetching franchise:', error);
                                     });
-
+                    
                                 voiceoverSelect.disabled = false;
                                 checkFormValidity();
                             });
-
-                        // Используем прокси-эндпоинт для отображения обложки
-                        const coverUrl = `https://shikimori.one${anime.image.original}`;
-                        const proxyCoverUrl = `${SERVER_URL}/proxy-cover?url=${encodeURIComponent(coverUrl)}`;
-
-                        coverImage.src = proxyCoverUrl;
-                        coverImage.style.display = 'block';
-
+                    
+                        // Получаем обложку высокого качества с вашего сервера
+                        getHighQualityCover(anime.id)
+                            .then(coverUrl => {
+                                const proxyCoverUrl = `${SERVER_URL}/proxy-cover?url=${encodeURIComponent(coverUrl)}`;
+                    
+                                coverImage.src = proxyCoverUrl;
+                                coverImage.style.display = 'block';
+                    
+                                // Загружаем обложку через прокси
+                                downloadCoverImage(coverUrl);
+                            })
+                            .catch(error => {
+                                console.error('Error fetching high-quality cover:', error);
+                    
+                                // Используем оригинальную обложку в качестве запасной
+                                const fallbackCoverUrl = `https://shikimori.one${anime.image.original}`;
+                                const proxyFallbackCoverUrl = `${SERVER_URL}/proxy-cover?url=${encodeURIComponent(fallbackCoverUrl)}`;
+                    
+                                coverImage.src = proxyFallbackCoverUrl;
+                                coverImage.style.display = 'block';
+                    
+                                downloadCoverImage(fallbackCoverUrl);
+                            });
+                    
                         dropzoneElement.classList.remove('disabled');
-
+                    
                         openingStartMinutes.disabled = false;
                         openingStartSeconds.disabled = false;
-
+                    
                         openingStartMinutes.addEventListener('input', function() {
                             calculateOpeningEnd();
                             checkFormValidity();
@@ -157,10 +176,7 @@ titleInput.addEventListener('input', function () {
                             calculateOpeningEnd();
                             checkFormValidity();
                         });
-
-                        // Автоматическая загрузка обложки через прокси
-                        downloadCoverImage(coverUrl);
-
+                    
                         checkFormValidity();
                     });
                     suggestions.appendChild(suggestionItem);
@@ -188,6 +204,26 @@ function resetCover() {
     coverImage.style.display = 'none';
     coverLoadingElement.style.display = 'none';
 }
+
+
+// Функция для получения обложки высокого качества с вашего сервера
+function getHighQualityCover(animeId) {
+    return fetch(`${SERVER_URL}/get-high-quality-cover?id=${animeId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data && data.coverUrl) {
+                return data.coverUrl;
+            } else {
+                throw new Error('Cover URL not found');
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching high-quality cover:', error);
+            throw error;
+        });
+}
+
+
 
 // Функция для скачивания обложки и преобразования её в файл
 function downloadCoverImage(url) {
@@ -414,6 +450,52 @@ function resetForm() {
     resetCover();
 }
 
+
+function resetAnimeFields() {
+    episodeInput.value = '';
+    episodeInput.disabled = true;
+    episodeInput.placeholder = '';
+
+    chronologyInput.value = '';
+    chronologyInput.disabled = true;
+
+    descriptionInput.value = '';
+    descriptionInput.disabled = true;
+
+    franchiseInput.value = '';
+    franchiseInput.disabled = true;
+
+    voiceoverSelect.value = '';
+    voiceoverSelect.disabled = true;
+
+    openingStartMinutes.value = '';
+    openingStartMinutes.disabled = true;
+
+    openingStartSeconds.value = '';
+    openingStartSeconds.disabled = true;
+
+    openingEndMinutes.value = '';
+    openingEndMinutes.disabled = true;
+
+    openingEndSeconds.value = '';
+    openingEndSeconds.disabled = true;
+
+    genresElement.textContent = '';
+    ratingElement.textContent = 'N/A';
+    totalEpisodesElement.textContent = 'N/A';
+
+    coverImage.src = '';
+    coverImage.style.display = 'none';
+
+    document.getElementById('anime-id').value = '';
+    document.getElementById('anime-title').value = '';
+    document.getElementById('anime-cover').value = '';
+
+    // Сброс переменной coverFile и отмена предыдущего запроса
+    resetCover();
+}
+
+
 // Функция для получения статуса очереди
 function getQueueStatus() {
     fetch(`${SERVER_URL}/queue-status`)
@@ -433,6 +515,7 @@ function getQueueStatus() {
 
 // Запуск функции получения статуса очереди при загрузке страницы и каждые 5 секунд
 document.addEventListener('DOMContentLoaded', function() {
+    resetForm();
     getQueueStatus();
     setInterval(getQueueStatus, 5000);
 });
