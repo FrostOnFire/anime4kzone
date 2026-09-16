@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <title>Video Enhancer</title>
-    <!-- Подключаем стили и скрипты -->
+    <!-- Styles and scripts -->
     <link href="https://unpkg.com/dropzone/dist/dropzone.css" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
     <style>
-        /* Пример простого стиля для индикатора загрузки */
+        /* Loading spinner */
         #cover-loading {
             color: blue;
             font-weight: bold;
@@ -32,7 +32,7 @@
         #suggestions li:hover {
             background-color: #f0f0f0;
         }
-        /* Дополнительные стили по необходимости */
+        /* Add further styles here */
         #container {
             display: flex;
             gap: 20px;
@@ -74,30 +74,30 @@
 <body>
     <h1>Video Enhancer</h1>
 
-    <!-- Форма для ввода данных -->
+    <!-- Metadata form -->
     <form id="title-form" autocomplete="off">
-        <!-- Название аниме -->
+        <!-- Title, autocompleted from Shikimori -->
         <label for="title-input">Название аниме:</label>
         <input type="text" id="title-input" name="title-input" required>
         <ul id="suggestions" style="display: none;"></ul>
 
-        <!-- Номер эпизода -->
+        <!-- Episode number -->
         <label for="episode-input">Номер эпизода:</label>
         <input type="number" id="episode-input" name="episode-input" disabled required>
 
-        <!-- Порядковый номер в хронологии -->
+        <!-- Position in the franchise chronology -->
         <label for="chronology-input">Порядковый номер в хронологии:</label>
         <input type="number" id="chronology-input" name="chronology-input" disabled required>
 
-        <!-- Название франшизы -->
+        <!-- Franchise -->
         <label for="franchise-input">Название франшизы:</label>
         <input type="text" id="franchise-input" name="franchise-input" disabled required>
 
-        <!-- Описание -->
+        <!-- Description -->
         <label for="description-input">Описание:</label>
         <textarea id="description-input" name="description-input" rows="4" disabled></textarea>
 
-        <!-- Озвучка -->
+        <!-- Dub / voiceover track -->
         <label for="voiceover-select">Озвучка:</label>
         <select id="voiceover-select" name="voiceover-select" disabled required>
             <option value="">Выберите озвучку</option>
@@ -109,17 +109,17 @@
             <option value="AniDub">AniDub</option>
             <option value="DreamCast">DreamCast</option>
             <option value="Смешанный">Смешанный</option>
-            <!-- Добавьте другие варианты по необходимости -->
+            <!-- add further options as needed -->
         </select>
 
-        <!-- Начало опенинга -->
+        <!-- Opening start time, so players can offer a skip -->
         <label for="opening-start">Начало опенинга (мин:сек):</label>
         <div>
             <input type="number" id="opening-start-minutes" name="opening-start-minutes" min="0" disabled required> :
             <input type="number" id="opening-start-seconds" name="opening-start-seconds" min="0" max="59" disabled required>
         </div>
 
-        <!-- Конец опенинга -->
+        <!-- Opening end time -->
         <label for="opening-end">Конец опенинга (мин:сек):</label>
         <div>
             <input type="number" id="opening-end-minutes" name="opening-end-minutes" min="0" disabled required> :
@@ -128,39 +128,39 @@
     </form>
     
     <div id="container">
-        <!-- Dropzone слева -->
+        <!-- Dropzone -->
         <div id="dropzone-container">
-            <!-- Указываем action формы с полным URL сервера -->
+            <!-- same-origin path; nginx proxies it to the Node server -->
             <form action="/upload" class="dropzone disabled" id="video-dropzone"></form>
         </div>
 
-        <!-- Изображение обложки справа -->
+        <!-- Cover image -->
         <div id="cover-container">
             <img id="cover-image" src="" alt="Anime Cover" style="display: none;">
         </div>
     </div>
     <p id="cover-loading" style="display: none;">Загрузка обложки...</p>
-    <!-- Дополнительные данные об аниме -->
+    <!-- Extra details pulled from Shikimori -->
     <div id="anime-info">
         <p>Жанры: <span id="genres"></span></p>
         <p>Всего эпизодов: <span id="total-episodes">N/A</span></p>
         <p>Рейтинг: <span id="rating">N/A</span></p>
     </div>
 
-    <!-- Скрытые поля для хранения данных аниме -->
+    <!-- Hidden fields carrying the Shikimori metadata -->
     <input type="hidden" id="anime-id" name="anime-id">
     <input type="hidden" id="anime-title" name="anime-title">
     <input type="hidden" id="anime-cover" name="anime-cover">
 
-    <!-- Кнопка отправки -->
+    <!-- Submit -->
     <button id="submit-btn" disabled>Отправить</button>
 
-    <!-- Секция для сообщений -->
+    <!-- Status messages -->
     <p id="queue-status"></p>
     <p id="log"></p>
     <p id="error"></p>
 
-    <!-- Подключение скриптов -->
+    <!-- Scripts -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dropzone/5.7.0/dropzone.min.js"></script>
     <script src="script.js"></script>
 </body>

@@ -1,4 +1,4 @@
-// server.js (Промежуточный сервер)
+// server.js — the GPU worker (PC-3)
 
 const redis = require('redis');
 const { Worker } = require('worker_threads');
@@ -20,11 +20,11 @@ redisClient.on('error', (err) => {
     console.error('Redis error:', err);
 });
 
-// Директории для временных файлов
+// Scratch directory for downloads and results
 const tempDir = path.join(__dirname, 'temp');
 if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
 
-// Функция для обработки следующей задачи в очереди
+// Take the next job off the queue and run it
 function processNextJob() {
     redisClient.lpop('video_jobs', async (err, jobData) => {
         if (err) {
@@ -43,21 +43,21 @@ function processNextJob() {
         console.log(`Starting processing job ${job.id}`);
 
         try {
-            // Скачиваем видео с основного сервера
+            // Download the source from the main server
             const inputFileUrl = `${MAIN_SERVER_URL}/uploads/${path.basename(job.inputPath)}`;
             const localInputPath = path.join(tempDir, path.basename(job.inputPath));
 
             await downloadFile(inputFileUrl, localInputPath);
 
-            // Обработка видео (вызов videoProcessor.js)
+            // Upscale it in a worker thread
             const localOutputPath = path.join(tempDir, `processed_${path.basename(job.inputPath)}`);
 
             await processVideo(localInputPath, localOutputPath);
 
-            // Загрузка обработанного видео в Google Cloud Storage
+            // Upload the result — NOT IMPLEMENTED, see uploadToGoogleCloud below
             const videoUrl = await uploadToGoogleCloud(localOutputPath);
 
-            // Отправка метаданных и обновление статуса на основном сервере
+            // Report the result back to the main server
             await axios.post(`${MAIN_SERVER_URL}/update-job`, {
                 jobId: job.id,
                 status: 'processed',
@@ -65,18 +65,18 @@ function processNextJob() {
                 videoUrl: videoUrl,
             });
 
-            // Удаление локальных файлов
+            // Clean up
             fs.unlinkSync(localInputPath);
             fs.unlinkSync(localOutputPath);
 
             console.log(`Job ${job.id} processed successfully`);
 
-            // Обработка следующей задачи
+            // On to the next job
             processNextJob();
         } catch (error) {
             console.error(`Error processing job ${job.id}:`, error);
 
-            // Возвращаем задачу в очередь для повторной попытки
+            // Put the job back so it is retried
             redisClient.rpush('video_jobs', jobData, (err) => {
                 if (err) console.error('Error returning job to Redis:', err);
             });
@@ -86,7 +86,7 @@ function processNextJob() {
     });
 }
 
-// Функция для скачивания файла
+// Stream a file to disk
 async function downloadFile(url, outputPath) {
     const response = await axios({
         url,
@@ -112,10 +112,10 @@ async function downloadFile(url, outputPath) {
     });
 }
 
-// Функция для обработки видео
+// Run Real-ESRGAN in a worker thread so the queue loop stays responsive
 async function processVideo(inputPath, outputPath) {
     return new Promise((resolve, reject) => {
-        // Запускаем новый worker для обработки видео
+        // One worker thread per job
         const worker = new Worker(path.join(__dirname, 'videoProcessor.js'), {
             workerData: { inputPath, outputPath }
         });
@@ -140,18 +140,12 @@ async function processVideo(inputPath, outputPath) {
     });
 }
 
-// Функция для загрузки файла в Google Cloud Storage
+// NOT IMPLEMENTED. The pipeline was never wired up to cloud storage: this
+// returns a placeholder URL which the main server stores as the video's
+// location, so results in fact stayed on the GPU node.
 async function uploadToGoogleCloud(filePath) {
-    // Здесь реализуйте код для загрузки файла в Google Cloud Storage
-    // Верните URL загруженного видео
-
-    // Пример:
-    // const videoUrl = await uploadFileToGCS(bucketName, filePath);
-    // return videoUrl;
-
-    // Временно возвращаем фиктивный URL
     return 'https://storage.googleapis.com/your_bucket/your_video.mp4';
 }
 
-// Запускаем обработку задач
+// Start the queue loop
 processNextJob();

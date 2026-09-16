@@ -9,9 +9,9 @@ const http = require('http');
 const { v4: uuidv4 } = require('uuid');
 const redis = require('redis');
 const { Pool } = require('pg');
-const fetch = require('node-fetch'); // Используем node-fetch версии 2
+const fetch = require('node-fetch'); // node-fetch v2 — the last CommonJS release
 
-require('dotenv').config(); // Загружает переменные окружения из .env файла
+require('dotenv').config(); // loads environment variables from .env
 
 const app = express();
 app.set('trust proxy', true);
@@ -25,15 +25,15 @@ app.use(cors({
 
 app.options('*', cors());
 
-// Настройка размеров и таймаутов для запросов
+// Request size limits and timeouts
 app.use(express.json({ limit: '3gb', timeout: 3600000 }));
 app.use(express.urlencoded({ extended: true, limit: '3gb', timeout: 3600000 }));
 
-// Настройка директорий для хранения файлов
+// Upload directory
 const uploadDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
-// Подключение к Redis
+// Redis — the job queue shared with the GPU worker
 const redisClient = redis.createClient({
     url: process.env.REDIS_URL || 'redis://localhost:6379',
 });
@@ -46,7 +46,7 @@ redisClient.on('connect', () => {
     console.log('Connected to Redis');
 });
 
-// Асинхронное подключение к Redis
+// Connect to Redis
 (async () => {
     try {
         await redisClient.connect();
@@ -56,12 +56,12 @@ redisClient.on('connect', () => {
     }
 })();
 
-// Подключение к базе данных PostgreSQL
+// PostgreSQL connection
 const pool = new Pool({
     user: process.env.DB_USER || 'frost',
     host: process.env.DB_HOST || 'localhost',
     database: process.env.DB_NAME || 'anime4kzone',
-    password: process.env.DB_PASSWORD, // Используйте переменную окружения для пароля
+    password: process.env.DB_PASSWORD, // never hardcode the password
     port: Number(process.env.DB_PORT) || 5432,
 });
 
@@ -73,12 +73,12 @@ pool.on('connect', () => {
     console.log('Connected to PostgreSQL');
 });
 
-// Настройка express-fileupload
+// File upload handling
 app.use(fileUpload({
-    limits: { fileSize: 3 * 1024 * 1024 * 1024 }, // Максимальный размер файла (3 ГБ)
+    limits: { fileSize: 3 * 1024 * 1024 * 1024 }, // max file size: 3 GB
     useTempFiles: true,
     tempFileDir: '/tmp/',
-    uploadTimeout: 3600000 // Таймаут загрузки (1 час)
+    uploadTimeout: 3600000 // upload timeout: 1 hour
 }));
 
 
@@ -89,7 +89,7 @@ app.get('/get-high-quality-cover', async (req, res) => {
     }
   
     try {
-      // Получаем актуальный токен доступа
+      // Fetch a current access token
       const accessToken = await getAccessToken();
   
       const query = `
@@ -130,7 +130,7 @@ app.get('/get-high-quality-cover', async (req, res) => {
   });
 
 
-// Маршрут для проксирования запросов к обложкам
+// Proxies cover images so the browser never calls Shikimori directly
 app.get('/proxy-cover', async (req, res) => {
     const imageUrl = req.query.url;
     if (!imageUrl) {
@@ -138,7 +138,7 @@ app.get('/proxy-cover', async (req, res) => {
     }
 
     try {
-        // Валидация хоста
+        // Host validation
         const urlObject = new URL(imageUrl);
         if (urlObject.hostname !== 'shikimori.one') {
             return res.status(400).json({ error: 'Invalid host' });
@@ -152,7 +152,7 @@ app.get('/proxy-cover', async (req, res) => {
         const contentType = response.headers.get('content-type');
         res.set('Content-Type', contentType);
 
-        // Потоковая передача данных
+        // Stream the image through
         response.body.pipe(res);
     } catch (error) {
         console.error('Error in /proxy-cover:', error);
@@ -160,7 +160,7 @@ app.get('/proxy-cover', async (req, res) => {
     }
 });
 
-// Маршрут для загрузки файлов и добавления задач в Redis
+// Accepts an upload and queues an upscale job
 app.post('/upload', async (req, res) => {
     console.log('Received /upload request');
     try {
@@ -169,14 +169,14 @@ app.post('/upload', async (req, res) => {
             return res.status(400).send('No files or metadata were uploaded.');
         }
 
-        // Извлекаем метаданные из req.body
+        // Metadata from the upload form
         const metadata = req.body;
         console.log('Metadata received:', metadata);
 
-        // Генерируем уникальный идентификатор для задачи
+        // Unique job id
         const uniqueId = uuidv4();
         const videoFile = req.files.file;
-        const coverFile = req.files.cover_file; // Получаем файл обложки, если он был загружен
+        const coverFile = req.files.cover_file; // cover image, if one was uploaded
 
         const safeVideoFileName = path.basename(videoFile.name);
         const inputPath = path.join(uploadDir, `${uniqueId}_${safeVideoFileName}`);
@@ -186,31 +186,31 @@ app.post('/upload', async (req, res) => {
             const safeCoverFileName = path.basename(coverFile.name);
             coverPath = path.join(uploadDir, `${uniqueId}_cover_${safeCoverFileName}`);
 
-            // Сохраняем обложку на сервере
+            // Store the cover
             await coverFile.mv(coverPath);
             console.log(`Cover image saved to ${coverPath}`);
             console.log(`Cover file size: ${coverFile.size} bytes`);
         }
 
-        // Сохраняем загруженный видео файл
+        // Store the uploaded video
         await videoFile.mv(inputPath);
         console.log(`Video file saved to ${inputPath}`);
 
-        // Добавляем путь к входному файлу в метаданные
+        // Record the source path in the metadata
         metadata.inputPath = inputPath;
 
         if (coverPath) {
-            metadata.coverPath = coverPath; // Добавляем путь к обложке в метаданные
+            metadata.coverPath = coverPath; // record the cover path too
         }
 
-        // Создаём объект задачи
+        // Build the job
         const job = {
             id: uniqueId,
             inputPath,
             metadata,
         };
 
-        // Добавляем задачу в Redis
+        // Push the job onto the queue the GPU worker reads
         await redisClient.RPUSH('video_jobs', JSON.stringify(job));
         console.log(`Job ${uniqueId} added to the Redis queue`);
         res.json({ uniqueId, message: 'Your video is added to the processing queue.' });
@@ -220,7 +220,7 @@ app.post('/upload', async (req, res) => {
     }
 });
 
-// Маршрут для получения статуса очереди
+// Queue length, polled by the client
 app.get('/queue-status', async (req, res) => {
     console.log('Received /queue-status request');
     try {
@@ -232,14 +232,14 @@ app.get('/queue-status', async (req, res) => {
     }
 });
 
-// Маршрут для обновления информации о задаче после обработки
+// Called by the GPU worker when a job finishes
 app.post('/update-job', async (req, res) => {
     console.log('Received /update-job request');
     const { jobId, status, metadata, videoUrl } = req.body;
     console.log(`Updating job ${jobId} with status ${status}`);
 
     try {
-        // Сохранение или обновление информации о франшизе
+        // Franchise
         let franchiseId;
         const { rows: existingFranchise } = await pool.query('SELECT id FROM franchises WHERE name = $1', [metadata.franchise]);
         if (existingFranchise.length === 0) {
@@ -251,7 +251,7 @@ app.post('/update-job', async (req, res) => {
             console.log(`Found existing franchise with ID ${franchiseId}`);
         }
 
-        // Сохранение или обновление информации об аниме
+        // Anime
         const { rows: existingAnime } = await pool.query('SELECT id FROM animes WHERE id = $1', [metadata.anime_id]);
         if (existingAnime.length === 0) {
             await pool.query(
@@ -263,7 +263,7 @@ app.post('/update-job', async (req, res) => {
             console.log(`Anime with ID ${metadata.anime_id} already exists`);
         }
 
-        // Обработка жанров
+        // Genres
         const genres = metadata.anime_genre.split(',').map(genre => genre.trim());
         for (let genreName of genres) {
             let { rows: existingGenre } = await pool.query('SELECT id FROM genres WHERE name = $1', [genreName]);
@@ -276,7 +276,7 @@ app.post('/update-job', async (req, res) => {
                 genreId = existingGenre[0].id;
                 console.log(`Genre '${genreName}' already exists with ID ${genreId}`);
             }
-            // Связь аниме с жанром
+            // Many-to-many link between anime and genre
             await pool.query(
                 'INSERT INTO anime_genres (anime_id, genre_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
                 [metadata.anime_id, genreId]
@@ -284,7 +284,7 @@ app.post('/update-job', async (req, res) => {
             console.log(`Linked anime ID ${metadata.anime_id} with genre ID ${genreId}`);
         }
 
-        // Сохранение информации о видео
+        // Video
         await pool.query(
             `INSERT INTO videos (
                 id, anime_id, episode, description, voiceover, opening_start, opening_end, input_path, output_path, status
@@ -300,19 +300,19 @@ app.post('/update-job', async (req, res) => {
                 metadata.opening_start,
                 metadata.opening_end,
                 metadata.inputPath,
-                videoUrl, // Сохраняем URL видео из Google Cloud Storage
+                videoUrl, // URL returned by the worker
                 status
             ]
         );
         console.log(`Saved video information for job ID ${jobId}`);
 
-        // Опционально: Сохранение обложки на сервере или в облаке
+        // Optional: move the cover elsewhere or upload it to storage
         if (metadata.coverPath) {
             console.log(`Cover image available at: ${metadata.coverPath}`);
-            // Здесь вы можете добавить логику для перемещения обложки в другое место или загрузки её в облако
+            // (not implemented)
         }
 
-        // Удаляем исходный файл после успешной обработки
+        // Drop the source file once the job succeeded
         const inputFilePath = metadata.inputPath;
         fs.unlink(inputFilePath, (err) => {
             if (err) {
@@ -329,24 +329,24 @@ app.post('/update-job', async (req, res) => {
     }
 });
 
-// Маршрут для проверки состояния сервера
+// Health check
 app.get('/health', (req, res) => {
     res.status(200).send('OK');
 });
 
-// Предоставление доступа к загруженным файлам для серверов-работников
+// Lets the GPU worker download the source file
 app.get('/uploads/:filename', (req, res) => {
     console.log(`Received request for uploaded file: ${req.params.filename}`);
     const filePath = path.join(uploadDir, req.params.filename);
     res.sendFile(filePath);
 });
 
-// Запуск сервера
+// Start the server
 const PORT = 9090;
 const server = http.createServer(app);
 
-// Устанавливаем таймауты для сервера
-server.timeout = 3600000; // 1 час
+// Server timeouts
+server.timeout = 3600000; // 1 hour
 server.headersTimeout = 4000000;
 server.keepAliveTimeout = 4000000;
 
@@ -354,7 +354,7 @@ server.listen(PORT, '0.0.0.0', () => {
     console.log(`Server started on http://0.0.0.0:${PORT}`);
 });
 
-// Обработка необработанных исключений и отклонённых промисов
+// Last-resort handlers
 process.on('uncaughtException', (err) => {
     console.error('Uncaught Exception:', err);
 });

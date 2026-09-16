@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# Останавливаем выполнение скрипта при ошибке
+# Stop on the first error
 set -e
 
-# Функции для вывода сообщений
+# Logging helpers
 function echo_info {
     echo -e "\e[32m[INFO]\e[0m $1"
 }
@@ -12,39 +12,29 @@ function echo_error {
     echo -e "\e[31m[ERROR]\e[0m $1"
 }
 
-# Проверка наличия необходимых переменных окружения
-if [ -z "$GITHUB_TOKEN" ]; then
-    echo_error "Переменная окружения GITHUB_TOKEN не установлена."
-    echo "Пожалуйста, установите её перед запуском скрипта:"
-    echo "export GITHUB_TOKEN=your_token_here"
-    exit 1
-fi
-
-# Порт для мини-сайта (по умолчанию 8080, если не задан)
+# Port the site is served on
 MINISITE_PORT=${MINISITE_PORT:-8080}
 
-echo_info "Обновление системы и установка необходимых пакетов..."
+REPO_ROOT=$(cd "$(dirname "$0")/.." && pwd)
+
+echo_info "Installing system packages..."
 sudo apt update && sudo apt upgrade -y
-sudo apt install -y git nginx curl build-essential nodejs npm ufw
+sudo apt install -y git nginx curl build-essential nodejs npm ufw postgresql redis-server
 
-echo_info "Клонирование репозитория..."
-cd /
-git clone https://$GITHUB_TOKEN@github.com/FrostOnFire/anime4kzone.git
+echo_info "Installing application dependencies..."
+cd "$REPO_ROOT/main-server"
+npm install
 
-echo_info "Установка зависимостей для приложения..."
-cd /anime4kzone
-npm install express express-fileupload uuid cors redis axios pg dotenv
-
-echo_info "Настройка Nginx..."
+echo_info "Configuring nginx..."
 sudo rm -f /etc/nginx/sites-enabled/default
 
-# Создание конфигурационного файла Nginx
+# nginx site config
 sudo tee /etc/nginx/sites-available/anime4kzone.conf > /dev/null <<EOF
 server {
     listen $MINISITE_PORT;
     server_name _;
 
-    root /anime4kzone/public;
+    root /main-server/public;
     index index.html;
 
     location / {
@@ -74,22 +64,22 @@ sudo ln -sf /etc/nginx/sites-available/anime4kzone.conf /etc/nginx/sites-enabled
 sudo nginx -t
 sudo systemctl restart nginx
 
-echo_info "Получение внешнего IPv4 адреса сервера..."
+echo_info "Looking up the external IPv4 address..."
 EXTERNAL_IP=$(curl -4 -s ifconfig.me)
 if [ -z "$EXTERNAL_IP" ]; then
-    echo_error "Не удалось получить внешний IPv4 адрес."
+    echo_error "Could not determine the external IPv4 address."
     exit 1
 fi
 
-echo_info "Внешний IP адрес: $EXTERNAL_IP"
+echo_info "External IP address: $EXTERNAL_IP"
 
 
-echo_info "Открытие порта $MINISITE_PORT в брандмауэре..."
-# Проверяем, активирован ли ufw
+echo_info "Opening port $MINISITE_PORT in the firewall..."
+# Enable ufw if it is not already running
 UFW_STATUS=$(sudo ufw status | grep -o "Status: active" || true)
 
 if [ -z "$UFW_STATUS" ]; then
-    echo_info "Брандмауэр UFW не активирован. Активируем UFW..."
+    echo_info "UFW is not active. Enabling it..."
     sudo ufw enable
 fi
 
@@ -97,6 +87,8 @@ sudo ufw allow $MINISITE_PORT
 sudo ufw allow 22/tcp
 sudo ufw reload
 
-echo_info "Настройка завершена. Интерфейс: http://$EXTERNAL_IP:$MINISITE_PORT"
-echo_info "Запуск сервера: cd /anime4kzone && node mainserver.js"
+echo_info "Setup complete. Interface: http://$EXTERNAL_IP:$MINISITE_PORT"
+echo_info "Create the database and load the schema, if you have not already:"
+echo_info "  psql -U \$DB_USER -d \$DB_NAME -f $REPO_ROOT/main-server/db/schema.sql"
+echo_info "Start the server: cd $REPO_ROOT/main-server && npm start"
 

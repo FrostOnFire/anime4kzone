@@ -26,7 +26,7 @@ const queueStatusElement = document.getElementById('queue-status');
 const coverLoadingElement = document.getElementById('cover-loading');
 
 let coverFile = null;
-let currentCoverAbortController = null; // Для отмены предыдущего запроса
+let currentCoverAbortController = null; // aborts the in-flight cover request
 
 episodeInput.disabled = true;
 chronologyInput.disabled = true;
@@ -38,16 +38,16 @@ openingEndMinutes.disabled = true;
 openingEndSeconds.disabled = true;
 voiceoverSelect.disabled = true;
 
-// Функция для удаления тегов из описания
+// Strip Shikimori's bbcode-style tags out of a description
 function removeCharacterTags(text) {
     return text
-        .replace(/\[.*?\]/g, '')  // Удалить содержимое в квадратных скобках
-        .replace(/[\[\]]/g, '')   // Удалить оставшиеся [ и ]
-        .replace(/\s+([,.!?])/g, '$1')  // Удалить пробел перед пунктуацией
+        .replace(/\[.*?\]/g, '')  // drop bracketed content
+        .replace(/[\[\]]/g, '')   // drop leftover brackets
+        .replace(/\s+([,.!?])/g, '$1')  // tidy spacing before punctuation
         .trim();
 }
 
-// Функция для очистки данных франшизы
+// Normalise a franchise name
 function cleanFranchiseData(franchiseDetails) {
     return franchiseDetails.nodes ? franchiseDetails.nodes.map(anime => ({
         id: anime.id,
@@ -56,17 +56,17 @@ function cleanFranchiseData(franchiseDetails) {
     })) : [];
 }
 
-// Функция для получения названия франшизы
+// Franchise name for an anime
 function getFranchiseTitle(sortedFranchise, fallbackTitle) {
     return sortedFranchise.length > 0 ? sortedFranchise[0].title : fallbackTitle;  
 }
 
-// Функция для получения порядкового номера в хронологии
+// Position of an anime within its franchise
 function getChronologyNumber(sortedFranchise, selectedAnimeId) {
     return sortedFranchise.length > 0 ? sortedFranchise.findIndex(anime => anime.id === selectedAnimeId) + 1 : 1;  
 }
 
-// Обработчик ввода в поле названия аниме
+// Title autocomplete against the Shikimori API
 titleInput.addEventListener('input', function () {
     const query = this.value;
 
@@ -81,9 +81,9 @@ titleInput.addEventListener('input', function () {
                     const suggestionItem = document.createElement('li');
                     suggestionItem.textContent = anime.russian;
                     suggestionItem.addEventListener('click', function () {
-                        // Сброс полей аниме
+                        // Reset the anime fields
                         resetAnimeFields();
-                        // При выборе нового аниме, сбрасываем предыдущие данные
+                        // picking a new title clears whatever was filled in before
                         resetCover();
                     
                         titleInput.value = anime.russian;
@@ -141,7 +141,7 @@ titleInput.addEventListener('input', function () {
                                 checkFormValidity();
                             });
                     
-                        // Получаем обложку высокого качества с вашего сервера
+                        // Ask our server for a high-quality cover
                         getHighQualityCover(anime.id)
                             .then(coverUrl => {
                                 const proxyCoverUrl = `${SERVER_URL}/proxy-cover?url=${encodeURIComponent(coverUrl)}`;
@@ -149,13 +149,13 @@ titleInput.addEventListener('input', function () {
                                 coverImage.src = proxyCoverUrl;
                                 coverImage.style.display = 'block';
                     
-                                // Загружаем обложку через прокси
+                                // fetch it through the proxy
                                 downloadCoverImage(coverUrl);
                             })
                             .catch(error => {
                                 console.error('Error fetching high-quality cover:', error);
                     
-                                // Используем оригинальную обложку в качестве запасной
+                                // fall back to the original cover
                                 const fallbackCoverUrl = `https://shikimori.one${anime.image.original}`;
                                 const proxyFallbackCoverUrl = `${SERVER_URL}/proxy-cover?url=${encodeURIComponent(fallbackCoverUrl)}`;
                     
@@ -190,25 +190,25 @@ titleInput.addEventListener('input', function () {
     }
 });
 
-// Функция для сброса предыдущей обложки
+// Clear the current cover
 function resetCover() {
-    // Отмена предыдущего запроса, если он существует
+    // abort a request still in flight
     if (currentCoverAbortController) {
         currentCoverAbortController.abort();
         currentCoverAbortController = null;
     }
 
-    // Сброс переменной coverFile
+    // forget the cover file
     coverFile = null;
 
-    // Скрытие обложки и индикатора загрузки в UI
+    // hide the image and the spinner
     coverImage.src = '';
     coverImage.style.display = 'none';
     coverLoadingElement.style.display = 'none';
 }
 
 
-// Функция для получения обложки высокого качества с вашего сервера
+// Ask the server for a high-quality cover
 function getHighQualityCover(animeId) {
     return fetch(`${SERVER_URL}/get-high-quality-cover?id=${animeId}`)
         .then(response => response.json())
@@ -227,12 +227,12 @@ function getHighQualityCover(animeId) {
 
 
 
-// Функция для скачивания обложки и преобразования её в файл
+// Download a cover and turn it into a File for the upload
 function downloadCoverImage(url) {
-    // Показываем индикатор загрузки
+    // show the spinner
     coverLoadingElement.style.display = 'block';
 
-    // Если уже идет загрузка, отменяем её
+    // cancel a download already running
     if (currentCoverAbortController) {
         currentCoverAbortController.abort();
     }
@@ -240,7 +240,7 @@ function downloadCoverImage(url) {
     currentCoverAbortController = new AbortController();
     const signal = currentCoverAbortController.signal;
 
-    // Используем прокси-эндпоинт вашего сервера
+    // go through our proxy: Shikimori sends no CORS headers
     const proxyUrl = `${SERVER_URL}/proxy-cover?url=${encodeURIComponent(url)}`;
 
     fetch(proxyUrl, { signal })
@@ -254,7 +254,7 @@ function downloadCoverImage(url) {
             const filename = url.split('/').pop().split('?')[0] || 'cover.jpg';
             coverFile = new File([blob], filename, { type: blob.type });
             console.log(`Cover image size: ${coverFile.size} bytes`);
-            // Вы можете также отобразить размер в интерфейсе, если необходимо
+            // the size could also be surfaced in the UI
         })
         .catch(error => {
             if (error.name === 'AbortError') {
@@ -266,12 +266,12 @@ function downloadCoverImage(url) {
         })
         .finally(() => {
             currentCoverAbortController = null;
-            // Скрываем индикатор загрузки
+            // hide the spinner
             coverLoadingElement.style.display = 'none';
         });
 }
 
-// Функция для расчёта конца опенинга
+// Work out the opening's end time
 function calculateOpeningEnd() {
     const startMinutes = parseInt(openingStartMinutes.value) || 0;
     const startSeconds = parseInt(openingStartSeconds.value) || 0;
@@ -289,7 +289,7 @@ function calculateOpeningEnd() {
     checkFormValidity();
 }
 
-// Функция для проверки валидности формы
+// Enable the submit button only once the form is complete
 function checkFormValidity() {
     const isTitleFilled = titleInput.value.trim() !== '';
     const isEpisodeFilled = episodeInput.value.trim() !== '';
@@ -320,7 +320,7 @@ function checkFormValidity() {
     }
 }
 
-// Настройки Dropzone
+// Dropzone configuration
 Dropzone.options.videoDropzone = {
     url: `${SERVER_URL}/upload`,
     maxFilesize: 3072, // 3 GB
@@ -328,11 +328,11 @@ Dropzone.options.videoDropzone = {
     autoProcessQueue: false,
     maxFiles: 1,
     addRemoveLinks: true,
-    timeout: 3600000, // 1 час
+    timeout: 3600000, // 1 hour
     init: function () {
         const myDropzone = this;
 
-        // Обработчик нажатия на кнопку отправки
+        // Submit button
         submitBtn.addEventListener('click', function (e) {
             e.preventDefault();
             e.stopPropagation();
@@ -344,7 +344,7 @@ Dropzone.options.videoDropzone = {
             }
         });
 
-        // Обработчики событий Dropzone
+        // Dropzone events
         this.on("addedfile", function (file) {
             console.log('File added:', file.name);
             checkFormValidity();
@@ -364,14 +364,14 @@ Dropzone.options.videoDropzone = {
             formData.append("chronology", chronologyInput.value);
             formData.append("description", descriptionInput.value);
             formData.append("voiceover", voiceoverSelect.value);
-            formData.append("franchise", franchiseInput.value); // Добавлено поле franchise
+            formData.append("franchise", franchiseInput.value); // franchise field
 
             const openingStartTime = parseInt(openingStartMinutes.value) * 60 + parseInt(openingStartSeconds.value);
             const openingEndTime = parseInt(openingEndMinutes.value) * 60 + parseInt(openingEndSeconds.value);
             formData.append("opening_start", openingStartTime);
             formData.append("opening_end", openingEndTime);
 
-            // Добавляем файл обложки, если он существует
+            // attach the cover, if we have one
             if (coverFile) {
                 formData.append("cover_file", coverFile);
                 console.log(`Cover file size: ${coverFile.size} bytes`);
@@ -403,7 +403,7 @@ Dropzone.options.videoDropzone = {
     }
 };
 
-// Функция для сброса формы после успешной отправки
+// Reset the form after a successful upload
 function resetForm() {
     titleInput.value = '';
     episodeInput.value = '';
@@ -448,7 +448,7 @@ function resetForm() {
     logElement.textContent = '';
     errorElement.textContent = '';
 
-    // Сброс coverFile и отмена предыдущего запроса
+    // clear the cover and abort any request in flight
     resetCover();
 }
 
@@ -493,12 +493,12 @@ function resetAnimeFields() {
     document.getElementById('anime-title').value = '';
     document.getElementById('anime-cover').value = '';
 
-    // Сброс переменной coverFile и отмена предыдущего запроса
+    // clear the cover and abort any request in flight
     resetCover();
 }
 
 
-// Функция для получения статуса очереди
+// Poll the queue length
 function getQueueStatus() {
     fetch(`${SERVER_URL}/queue-status`)
     .then(response => {
@@ -515,14 +515,14 @@ function getQueueStatus() {
     });
 }
 
-// Запуск функции получения статуса очереди при загрузке страницы и каждые 5 секунд
+// Poll on load, then every 5 seconds
 document.addEventListener('DOMContentLoaded', function() {
     resetForm();
     getQueueStatus();
     setInterval(getQueueStatus, 5000);
 });
 
-// Добавление обработчиков событий для проверки валидности формы
+// Re-check form validity as fields change
 titleInput.addEventListener('input', checkFormValidity);
 episodeInput.addEventListener('input', function() {
     if (episodeInput.value > 0) {

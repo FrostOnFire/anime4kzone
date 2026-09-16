@@ -5,10 +5,10 @@ const fetch = require('node-fetch');
 const fs = require('fs');
 const path = require('path');
 
-// Путь к файлу, где будет храниться токен и время его истечения
+// Where the token and its expiry are cached between runs
 const tokenDataPath = path.join(__dirname, 'shikimoriToken.json');
 
-// Функция для получения нового токена доступа
+// Request a fresh access token
 async function fetchAccessToken() {
   const tokenUrl = 'https://shikimori.one/oauth/token';
   const params = new URLSearchParams();
@@ -31,10 +31,10 @@ async function fetchAccessToken() {
 
     const data = await response.json();
     const accessToken = data.access_token;
-    const expiresIn = data.expires_in; // Время жизни токена в секундах
-    const expiresAt = Date.now() + expiresIn * 1000; // Время истечения токена в миллисекундах
+    const expiresIn = data.expires_in; // token lifetime, in seconds
+    const expiresAt = Date.now() + expiresIn * 1000; // expiry as a timestamp, in ms
 
-    // Сохраняем токен и время его истечения в файл
+    // Cache the token and its expiry
     const tokenData = {
       accessToken,
       expiresAt,
@@ -49,28 +49,28 @@ async function fetchAccessToken() {
   }
 }
 
-// Функция для получения актуального токена доступа
+// Return a valid token, refreshing it when needed
 async function getAccessToken() {
   try {
     if (fs.existsSync(tokenDataPath)) {
       const tokenData = JSON.parse(fs.readFileSync(tokenDataPath, 'utf8'));
 
       if (Date.now() < tokenData.expiresAt) {
-        // Токен ещё действителен
+        // still valid
         return tokenData.accessToken;
       } else {
-        // Токен истёк, получаем новый
+        // expired — fetch a new one
         console.log('Access token expired, fetching a new one.');
         return await fetchAccessToken();
       }
     } else {
-      // Файл не существует, получаем новый токен
+      // nothing cached yet
       console.log('No access token found, fetching a new one.');
       return await fetchAccessToken();
     }
   } catch (error) {
     console.error('Error reading or parsing token data:', error);
-    // В случае ошибки пытаемся получить новый токен
+    // on any read error, fall back to fetching a new token
     return await fetchAccessToken();
   }
 }

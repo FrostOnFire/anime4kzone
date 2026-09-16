@@ -13,12 +13,12 @@ const env = Object.assign({}, process.env, { CUDA_VISIBLE_DEVICES: '0' });
 
 const esrganProcess = spawn('python3', [
     path.join(REALESRGAN_DIR, 'inference_realesrgan_video.py'),
-    '-i', inputPath,  // Путь к входному видео
-    '-o', outputPath, // Путь к выходному видео
-    '-n', 'realesr-animevideov3',  // Название модели
-    '-s', '3',  // Множитель увеличения
-    '--num_process_per_gpu', '8',  // Количество процессов на GPU
-    '--fps', '30'  // Частота кадров
+    '-i', inputPath,  // source
+    '-o', outputPath, // result
+    '-n', 'realesr-animevideov3',  // anime-tuned model
+    '-s', '3',  // upscale factor
+    '--num_process_per_gpu', '8',  // parallel processes on the GPU
+    '--fps', '30'  // output frame rate
 ], { env });
 
 esrganProcess.stdout.on('data', (data) => {
