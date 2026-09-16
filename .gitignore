@@ -3,10 +3,35 @@
 
 # Dependencies
 node_modules/
+gpu-worker/myenv/
 
-# Runtime artefacts — created by the server at run time
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Real-ESRGAN is upstream code, installed by gpu-worker/setup.sh — see README
+Real-ESRGAN/
+
+# Runtime artefacts — created at run time, never committed
 main-server/uploads/
 main-server/shikimoriToken.json
+gpu-worker/temp/
+processed/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Local-only credentials and notes from the rented GPU node
+keys.txt
+onstart.txt
+
+# Test footage (kept locally, never committed)
+gpu-worker/a.mp4
 
 # OS junk
 .DS_Store
