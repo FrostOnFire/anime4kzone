@@ -28,3 +28,6 @@ processed/
 # Test footage (kept locally, never committed)
 animeWEB/a.mp4
 Real-ESRGAN/1.mp4
+
+# Real-ESRGAN is upstream code, installed by setup.sh — see README
+Real-ESRGAN/
