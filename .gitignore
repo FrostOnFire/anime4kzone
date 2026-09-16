@@ -5,8 +5,8 @@
 node_modules/
 
 # Runtime artefacts — created by the server at run time
-uploads/
-shikimoriToken.json
+main-server/uploads/
+main-server/shikimoriToken.json
 
 # OS junk
 .DS_Store
