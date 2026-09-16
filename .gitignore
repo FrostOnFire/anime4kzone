@@ -1,6 +1,6 @@
 # Node.js
 node_modules/
-animeWEB/myenv/
+gpu-worker/myenv/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -26,7 +26,7 @@ uploads/
 processed/
 
 # Test footage (kept locally, never committed)
-animeWEB/a.mp4
+gpu-worker/a.mp4
 Real-ESRGAN/1.mp4
 
 # Real-ESRGAN is upstream code, installed by setup.sh — see README
