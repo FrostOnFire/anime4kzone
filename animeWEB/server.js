@@ -6,11 +6,14 @@ const path = require('path');
 const fs = require('fs');
 const axios = require('axios');
 
-// Настройки подключения к Redis на основном сервере
+require('dotenv').config();
+
+// Main server (PC-2): serves the source files and receives job status updates.
+const MAIN_SERVER_URL = process.env.MAIN_SERVER_URL || 'http://localhost:9090';
+
+// The job queue lives on the main server, so both nodes share one Redis.
 const redisClient = redis.createClient({
-    host: '203.0.113.10', // Замените на IP-адрес основного сервера
-    port: 6379,
-    // password: 'your_redis_password', // Если установлен пароль, раскомментируйте и укажите его
+    url: process.env.REDIS_URL || 'redis://localhost:6379',
 });
 
 redisClient.on('error', (err) => {
@@ -41,7 +44,7 @@ function processNextJob() {
 
         try {
             // Скачиваем видео с основного сервера
-            const inputFileUrl = `http://your_main_server_ip/uploads/${path.basename(job.inputPath)}`;
+            const inputFileUrl = `${MAIN_SERVER_URL}/uploads/${path.basename(job.inputPath)}`;
             const localInputPath = path.join(tempDir, path.basename(job.inputPath));
 
             await downloadFile(inputFileUrl, localInputPath);
@@ -55,7 +58,7 @@ function processNextJob() {
             const videoUrl = await uploadToGoogleCloud(localOutputPath);
 
             // Отправка метаданных и обновление статуса на основном сервере
-            await axios.post(`http://your_main_server_ip/update-job`, {
+            await axios.post(`${MAIN_SERVER_URL}/update-job`, {
                 jobId: job.id,
                 status: 'processed',
                 metadata: job.metadata,
