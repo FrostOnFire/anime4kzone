@@ -24,3 +24,7 @@ logs/
 # Uploads and processed videos
 uploads/
 processed/
+
+# Test footage (kept locally, never committed)
+animeWEB/a.mp4
+Real-ESRGAN/1.mp4
