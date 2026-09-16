@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: JavaScript syntax
+        run: |
+          for f in $(git ls-files '*.js'); do
+            node --check "$f"
+          done
+
+      - name: Manifests parse
+        run: |
+          for f in $(git ls-files '*.json'); do
+            node -e "JSON.parse(require('fs').readFileSync('$f','utf8'))"
+          done
+
+      - name: Shell syntax
+        run: |
+          for f in $(git ls-files '*.sh'); do
+            bash -n "$f"
+          done
+
+      # bash -n happily accepts a stray '\\' at end of line, which silently
+      # truncates the command that follows. Catch it explicitly.
+      - name: No truncated line continuations
+        run: |
+          if grep -n '\\\\$' $(git ls-files '*.sh'); then
+            echo "Found '\\\\' at end of line — this breaks the command."
+            exit 1
+          fi
+
+      - name: Schema loads into PostgreSQL
+        run: psql -v ON_ERROR_STOP=1 -f main-server/db/schema.sql
+
+      - name: Schema matches the queries the server runs
+        run: |
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          INSERT INTO franchises (name) VALUES ('Test Franchise');
+          INSERT INTO animes (id, franchise_id, title, cover, chronology)
+              VALUES (1, 1, 'Test Anime', 'https://example.com/c.jpg', 1);
+          INSERT INTO genres (name) VALUES ('Sci-Fi');
+          INSERT INTO anime_genres (anime_id, genre_id) VALUES (1, 1) ON CONFLICT DO NOTHING;
+          -- the same upload twice must stay a no-op
+          INSERT INTO anime_genres (anime_id, genre_id) VALUES (1, 1) ON CONFLICT DO NOTHING;
+          INSERT INTO videos (
+              id, anime_id, episode, description, voiceover,
+              opening_start, opening_end, input_path, output_path, status
+          ) VALUES (
+              '11f20b2e-01a7-4823-9131-d18da2c9d630', 1, 1, 'desc', 'dub',
+              63, 153, '/tmp/in.mp4', 'https://example.com/out.mp4', 'processed'
+          );
+          SQL

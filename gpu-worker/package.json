@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Pulls upscale jobs off the Redis queue and runs Real-ESRGAN on the GPU node",
   "main": "server.js",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "start": "node server.js"
   },

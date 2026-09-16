@@ -1,0 +1,23 @@
+# Installed by setup.sh, which fills in the paths and the user.
+# Manually: edit WorkingDirectory/User, copy to /etc/systemd/system/,
+# then `systemctl enable --now anime4kzone-worker`.
+
+[Unit]
+Description=anime4kzone GPU worker
+After=network.target
+
+[Service]
+Type=simple
+# The worker reads .env from its working directory through dotenv.
+WorkingDirectory=__APP_DIR__
+ExecStart=/usr/bin/env node server.js
+User=__RUN_USER__
+# A job runs for hours; never kill it for being slow.
+TimeoutStopSec=30
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

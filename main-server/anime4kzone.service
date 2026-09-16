@@ -1,0 +1,22 @@
+# Installed by script.sh, which fills in the paths and the user.
+# Manually: edit WorkingDirectory/User, copy to /etc/systemd/system/,
+# then `systemctl enable --now anime4kzone`.
+
+[Unit]
+Description=anime4kzone main server
+After=network.target postgresql.service redis-server.service
+Wants=postgresql.service redis-server.service
+
+[Service]
+Type=simple
+# The app reads .env from its working directory through dotenv.
+WorkingDirectory=__APP_DIR__
+ExecStart=/usr/bin/env node mainserver.js
+User=__RUN_USER__
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

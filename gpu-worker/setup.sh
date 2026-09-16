@@ -54,12 +54,18 @@ cd "$REPO_ROOT/gpu-worker"
 npm install
 
 echo_info "Verifying that the GPU is visible to PyTorch..."
-python3 py.py
+python3 check_gpu.py
 
 if [ ! -f "$REPO_ROOT/gpu-worker/.env" ]; then
     echo_error "No .env yet. Copy .env.example to .env and point REDIS_URL and"
     echo_error "MAIN_SERVER_URL at the main server before starting the worker."
 fi
 
+echo_info "Installing the systemd service..."
+sed -e "s|__APP_DIR__|$REPO_ROOT/gpu-worker|" -e "s|__RUN_USER__|$USER|" "$REPO_ROOT/gpu-worker/anime4kzone-worker.service" | sudo tee /etc/systemd/system/anime4kzone-worker.service > /dev/null
+sudo systemctl daemon-reload
+sudo systemctl enable anime4kzone-worker
+
 echo_info "Setup complete. Start the worker with:"
-echo_info "  cd $REPO_ROOT/gpu-worker && npm start"
+echo_info "  sudo systemctl start anime4kzone-worker"
+echo_info "Logs: journalctl -u anime4kzone-worker -f"

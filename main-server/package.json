@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Takes uploads, records metadata in PostgreSQL and queues upscale jobs for the GPU worker",
   "main": "mainserver.js",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "start": "node mainserver.js"
   },

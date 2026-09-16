@@ -1,5 +1,7 @@
 # anime4kzone
 
+[![CI](https://github.com/FrostOnFire/anime4kzone/actions/workflows/ci.yml/badge.svg)](https://github.com/FrostOnFire/anime4kzone/actions/workflows/ci.yml)
+
 A distributed pipeline for upscaling anime episodes. A browser uploads an
 episode, a main server records its metadata and queues the job, and a rented
 GPU machine picks the job up and runs [Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN)
@@ -53,6 +55,7 @@ seconds.
 | `main-server/db/schema.sql` | The PostgreSQL schema |
 | `main-server/public/` | Drop zone, metadata form and client logic |
 | `gpu-worker/` | Queue consumer and the Real-ESRGAN wrapper (PC-3) |
+| `*/*.service` | systemd units, installed by the provisioning scripts |
 | `docs/architecture.md` | Endpoints, data model and design notes |
 
 Real-ESRGAN is not vendored here. `gpu-worker/setup.sh` installs it from
@@ -67,11 +70,17 @@ Both nodes are provisioned by script on Ubuntu:
 cp main-server/.env.example main-server/.env   # then fill it in
 ./main-server/script.sh
 psql -U "$DB_USER" -d "$DB_NAME" -f main-server/db/schema.sql
+sudo systemctl start anime4kzone
 
 # GPU node (PC-3): CUDA-capable, Real-ESRGAN, the worker
 cp gpu-worker/.env.example gpu-worker/.env     # point it at the main server
 ./gpu-worker/setup.sh
+sudo systemctl start anime4kzone-worker
 ```
+
+Both scripts install a systemd unit, so each node restarts on failure and comes
+back after a reboot. Logs go to the journal:
+`journalctl -u anime4kzone -f`.
 
 nginx serves the client and proxies every API call to the Express server, so
 the two are same-origin and nothing but port 8080 needs to be exposed.

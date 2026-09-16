@@ -87,8 +87,14 @@ sudo ufw allow $MINISITE_PORT
 sudo ufw allow 22/tcp
 sudo ufw reload
 
+echo_info "Installing the systemd service..."
+sed -e "s|__APP_DIR__|$REPO_ROOT/main-server|" -e "s|__RUN_USER__|$USER|" "$REPO_ROOT/main-server/anime4kzone.service" | sudo tee /etc/systemd/system/anime4kzone.service > /dev/null
+sudo systemctl daemon-reload
+sudo systemctl enable anime4kzone
+
 echo_info "Setup complete. Interface: http://$EXTERNAL_IP:$MINISITE_PORT"
 echo_info "Create the database and load the schema, if you have not already:"
 echo_info "  psql -U \$DB_USER -d \$DB_NAME -f $REPO_ROOT/main-server/db/schema.sql"
-echo_info "Start the server: cd $REPO_ROOT/main-server && npm start"
+echo_info "Start the server: sudo systemctl start anime4kzone"
+echo_info "Logs: journalctl -u anime4kzone -f"
 

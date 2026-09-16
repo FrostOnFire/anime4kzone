@@ -16,14 +16,16 @@ require('dotenv').config(); // loads environment variables from .env
 const app = express();
 app.set('trust proxy', true);
 
-// CORS. Behind the bundled nginx config the client is same-origin, so this is
-// a no-op; set CLIENT_ORIGIN when the client is served from another host.
-app.use(cors({
-    origin: process.env.CLIENT_ORIGIN || true,
-    credentials: true
-}));
-
-app.options('*', cors());
+// CORS is only enabled when the client is served from another host. Behind the
+// bundled nginx config it is same-origin, so no CORS headers are sent at all —
+// reflecting an arbitrary origin while allowing credentials would be unsafe.
+if (process.env.CLIENT_ORIGIN) {
+    app.use(cors({
+        origin: process.env.CLIENT_ORIGIN,
+        credentials: true
+    }));
+    app.options('*', cors());
+}
 
 // Request size limits and timeouts
 app.use(express.json({ limit: '3gb', timeout: 3600000 }));
@@ -58,7 +60,7 @@ redisClient.on('connect', () => {
 
 // PostgreSQL connection
 const pool = new Pool({
-    user: process.env.DB_USER || 'frost',
+    user: process.env.DB_USER || 'anime4kzone',
     host: process.env.DB_HOST || 'localhost',
     database: process.env.DB_NAME || 'anime4kzone',
     password: process.env.DB_PASSWORD, // never hardcode the password
