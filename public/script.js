@@ -1,6 +1,8 @@
 // script.js
 
-const SERVER_URL = 'http://203.0.113.10:9090';
+// API calls go to the same origin; nginx proxies them to the Node server.
+// Set window.API_BASE_URL before this script to target a different host.
+const SERVER_URL = window.API_BASE_URL || '';
 const suggestions = document.getElementById('suggestions');
 const titleInput = document.getElementById('title-input');
 const episodeInput = document.getElementById('episode-input');

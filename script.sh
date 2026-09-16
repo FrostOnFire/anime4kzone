@@ -51,31 +51,21 @@ server {
         try_files \$uri \$uri/ /index.html;
     }
 
-    location /uploads/ {
-        proxy_pass http://localhost:9090/uploads/;
+    # Everything the browser calls is proxied to the Node server, so the client
+    # uses same-origin paths and needs no CORS.
+    location ~ ^/(upload|uploads|update-job|queue-status|proxy-cover|get-high-quality-cover|health) {
+        proxy_pass http://localhost:9090;
         proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection 'upgrade';
         proxy_set_header Host \$host;
-        proxy_cache_bypass \$http_upgrade;
-    }
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
 
-    location /upload {
-        proxy_pass http://localhost:9090/upload;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host \$host;
-        proxy_cache_bypass \$http_upgrade;
-    }
-
-    location /update-job {
-        proxy_pass http://localhost:9090/update-job;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host \$host;
-        proxy_cache_bypass \$http_upgrade;
+        # Source files reach 3 GB and upscaling a single episode runs for hours.
+        client_max_body_size 3g;
+        proxy_request_buffering off;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
     }
 }
 EOF
@@ -93,58 +83,6 @@ fi
 
 echo_info "Внешний IP адрес: $EXTERNAL_IP"
 
-# Путь к index.html
-INDEX_HTML_PATH="/anime4kzone/public/index.html"
-
-# Проверка существования файла
-if [ ! -f "$INDEX_HTML_PATH" ]; then
-    echo_error "Файл $INDEX_HTML_PATH не найден."
-    exit 1
-fi
-
-# Путь к script.js
-SCRIPT_JS_PATH="/anime4kzone/public/script.js"
-
-# Проверка существования файла
-if [ ! -f "$SCRIPT_JS_PATH" ]; then
-    echo_error "Файл $SCRIPT_JS_PATH не найден."
-    exit 1
-fi
-
-# Создание URL для UPLOAD_URL и SERVER_URL
-UPLOAD_URL="http://$EXTERNAL_IP:$MINISITE_PORT/upload"
-SERVER_URL="http://$EXTERNAL_IP:9090"
-
-echo_info "Обновление index.html с актуальным UPLOAD_URL..."
-# Замена UPLOAD_URL в index.html
-sed -i "s|{{UPLOAD_URL}}|$UPLOAD_URL|g" "$INDEX_HTML_PATH"
-
-echo_info "Файл index.html обновлён с новым UPLOAD_URL."
-
-echo_info "Обновление script.js с актуальным SERVER_URL..."
-# Замена SERVER_URL в script.js
-sed -i "s|const SERVER_URL = '{{SERVER_URL}}';|const SERVER_URL = '$SERVER_URL';|g" "$SCRIPT_JS_PATH"
-
-echo_info "Файл script.js обновлён с новым SERVER_URL."
-
-echo_info "Обновление mainserver.js с актуальным CLIENT_URL..."
-# Путь к mainserver.js
-SERVER_JS_PATH="/anime4kzone/mainserver.js"
-
-# Проверка существования файла
-if [ ! -f "$SERVER_JS_PATH" ]; then
-    echo_error "Файл $SERVER_JS_PATH не найден."
-    exit 1
-fi
-
-# Создание CLIENT_URL
-CLIENT_URL="http://$EXTERNAL_IP:$MINISITE_PORT"
-
-echo_info "Обновление CORS origin в mainserver.js..."
-# Замена CLIENT_URL в mainserver.js
-sed -i "s|origin: '{{CLIENT_URL}}'|origin: '$CLIENT_URL'|g" "$SERVER_JS_PATH"
-
-echo_info "Файл mainserver.js обновлён с новым CLIENT_URL."
 
 echo_info "Открытие порта $MINISITE_PORT в брандмауэре..."
 # Проверяем, активирован ли ufw
@@ -157,10 +95,8 @@ fi
 
 sudo ufw allow $MINISITE_PORT
 sudo ufw allow 22/tcp
-sudo ufw allow 9090
 sudo ufw reload
 
-echo_info "Настройка завершена. Вы можете запустить ваше Node.js приложение вручную командой:"
-echo_info "cd /anime4kzone && node mainserver.js"
+echo_info "Настройка завершена. Интерфейс: http://$EXTERNAL_IP:$MINISITE_PORT"
+echo_info "Запуск сервера: cd /anime4kzone && node mainserver.js"
 
-echo_info "Доступ к мини-сайту осуществляется по адресу: http://$EXTERNAL_IP:$MINISITE_PORT"

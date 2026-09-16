@@ -16,9 +16,10 @@ require('dotenv').config(); // Загружает переменные окру�
 const app = express();
 app.set('trust proxy', true);
 
-// Настройка CORS
+// CORS. Behind the bundled nginx config the client is same-origin, so this is
+// a no-op; set CLIENT_ORIGIN when the client is served from another host.
 app.use(cors({
-    origin: 'http://203.0.113.10:8080', // Замените на фактический URL вашего клиента
+    origin: process.env.CLIENT_ORIGIN || true,
     credentials: true
 }));
 
@@ -34,7 +35,7 @@ if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
 // Подключение к Redis
 const redisClient = redis.createClient({
-    //url: 'redis://localhost:6379', // Если Redis на другом сервере, укажите его URL
+    url: process.env.REDIS_URL || 'redis://localhost:6379',
 });
 
 redisClient.on('error', (err) => {
@@ -58,10 +59,10 @@ redisClient.on('connect', () => {
 // Подключение к базе данных PostgreSQL
 const pool = new Pool({
     user: process.env.DB_USER || 'frost',
-    host: 'localhost',
+    host: process.env.DB_HOST || 'localhost',
     database: process.env.DB_NAME || 'anime4kzone',
     password: process.env.DB_PASSWORD, // Используйте переменную окружения для пароля
-    port: 5432,
+    port: Number(process.env.DB_PORT) || 5432,
 });
 
 pool.on('error', (err) => {
@@ -150,9 +151,6 @@ app.get('/proxy-cover', async (req, res) => {
 
         const contentType = response.headers.get('content-type');
         res.set('Content-Type', contentType);
-
-        // Разрешаем CORS для вашего клиента
-        res.set('Access-Control-Allow-Origin', 'http://203.0.113.10:8080');
 
         // Потоковая передача данных
         response.body.pipe(res);
