@@ -10,10 +10,10 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 
-# Real-ESRGAN is upstream code, installed by gpu-worker/setup.sh — see README
+# Real-ESRGAN is upstream code, installed by gpu-worker/setup.sh (see README)
 Real-ESRGAN/
 
-# Runtime artefacts — created at run time, never committed
+# Written at run time, never committed
 main-server/uploads/
 main-server/shikimoriToken.json
 gpu-worker/temp/

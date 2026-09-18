@@ -57,7 +57,7 @@ jobs:
       - name: No truncated line continuations
         run: |
           if grep -n '\\\\$' $(git ls-files '*.sh'); then
-            echo "Found '\\\\' at end of line — this breaks the command."
+            echo "Found '\\\\' at end of line. This truncates the command."
             exit 1
           fi
 

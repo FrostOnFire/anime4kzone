@@ -45,7 +45,7 @@ if [ -f "$DEGRADATIONS_FILE" ]; then
     sed -i "s|from torchvision.transforms.functional_tensor import rgb_to_grayscale|from torchvision.transforms.functional import rgb_to_grayscale|g" "$DEGRADATIONS_FILE"
     echo_info "Patched $DEGRADATIONS_FILE"
 else
-    echo_error "$DEGRADATIONS_FILE not found — check the basicsr install."
+    echo_error "$DEGRADATIONS_FILE not found. Check the basicsr install."
     exit 1
 fi
 

@@ -3,75 +3,76 @@
 ## Why three machines
 
 The GPU was rented by the hour, so it could not hold anything that needed to
-outlive a session. Everything durable — the database, the uploaded files, the
-queue — lives on the always-on main server, and the GPU node is a stateless
-consumer: it can be destroyed and recreated between jobs without losing work.
+outlive a session. Everything durable lives on the always-on server: the
+database, the uploaded files, the queue. That leaves the GPU node stateless. It
+can be destroyed and rebuilt between jobs and nothing is lost.
 
 | Machine | Role |
 |---|---|
-| PC-1 | Any browser. Serves no code of its own. |
-| PC-2 | nginx, Express, PostgreSQL, Redis, uploaded files. |
+| PC-1 | Any browser. Runs no code of its own. |
+| PC-2 | nginx, Express, PostgreSQL, Redis, the uploaded files. |
 | PC-3 | Rented GPU box. Real-ESRGAN and the queue consumer. |
 
 ## Endpoints
 
-All of these live on the Express server and are reached through nginx.
+All of these are on the Express server and reached through nginx.
 
 | Endpoint | Purpose |
 |---|---|
-| `POST /upload` | Accepts the video and metadata, stores the file, queues the job |
-| `GET /queue-status` | Queue length, polled by the client every 5 seconds |
-| `POST /update-job` | Called by the GPU worker when a job finishes; writes the episode to PostgreSQL |
+| `POST /upload` | Takes the video and metadata, saves the file, queues the job |
+| `GET /queue-status` | How many jobs are waiting; the page polls it every 5 seconds |
+| `POST /update-job` | The worker calls this when a job finishes; writes the episode to PostgreSQL |
 | `GET /uploads/:filename` | Lets the worker download the source file |
 | `GET /get-high-quality-cover` | Fetches a full-size cover from Shikimori |
 | `GET /proxy-cover` | Proxies cover images, with host validation |
 | `GET /health` | Liveness check |
 
-`/proxy-cover` exists because Shikimori serves images without CORS headers, so
-the browser cannot fetch a cover and turn it into an upload attachment on its
-own. The proxy validates the host before fetching, so it cannot be used as an
-open relay.
+`/proxy-cover` is there because Shikimori serves images without CORS headers,
+so the browser cannot fetch a cover and attach it to the upload by itself. The
+proxy checks the host before fetching, so it cannot be pointed at anything else.
 
 ## Data model
 
-Five tables, normalised rather than one row per upload:
+Five tables rather than one row per upload:
 
-- `franchises` — one row per franchise, referenced by `animes.franchise_id`
-- `animes` — keyed by the **Shikimori id**, not a local sequence, so the same
-  anime keeps a stable id across uploads and stays linkable to the API
-- `genres` — one row per genre name
-- `anime_genres` — the many-to-many join, with a composite primary key. That key
+- `franchises`, one row per franchise, referenced by `animes.franchise_id`
+- `animes`, keyed by the Shikimori id rather than a local sequence, so the same
+  anime keeps a stable id across uploads and stays linkable back to the API
+- `genres`, one row per genre name
+- `anime_genres`, the many-to-many link, with a composite primary key. That key
   is what lets `/update-job` insert genre links with `ON CONFLICT DO NOTHING`
   and stay idempotent when the same anime is uploaded again
-- `videos` — one row per uploaded episode, keyed by the job id
+- `videos`, one row per uploaded episode, keyed by the job id
 
-Opening timestamps are stored as seconds from the start of the episode. The
-client only asks for the start: the end is derived as start + 90 seconds, which
-is the length of a standard opening.
+Opening timestamps are stored in seconds from the start of the episode. The form
+only asks where the opening starts. The end is start plus 90 seconds, because
+that is how long a standard opening runs.
 
 ## The queue
 
-Redis holds a single list, `video_jobs`. The main server `RPUSH`es a JSON job on
-upload; the worker `LPOP`s it, and on failure `RPUSH`es it back for a retry.
-Queue depth is read with `LLEN`.
+Redis holds one list, `video_jobs`. The main server `RPUSH`es a JSON job when a
+file is uploaded, the worker `LPOP`s it, and on failure pushes it back for
+another try. Queue depth comes from `LLEN`.
 
-Uploads are capped at 3 GB, with hour-long timeouts on Express, nginx and the
-HTTP server, because a single episode takes hours to upscale and the transfer
-itself is large.
+Uploads are capped at 3 GB, with hour-long timeouts on Express, on nginx and on
+the HTTP server itself, because upscaling an episode takes hours and the files
+are large to begin with.
 
-## Known limitations
+## What I would fix next
 
-Worth naming, because they are the parts a second pass would address:
+A job that always fails gets pushed back onto the queue forever. There is no
+attempt counter and no dead letter list, so one bad file can cycle indefinitely.
 
-- **A failing job retries forever.** A job that always fails is pushed back onto
-  the queue indefinitely. There is no attempt counter and no dead-letter list.
-- **Retries go to the back of the queue.** `RPUSH` on failure means a retried
-  job waits behind everything queued since.
-- **No `GETDEL`-style safety.** `LPOP` removes the job before it is done, so a
-  worker that dies mid-job loses it. `BLMOVE` into a processing list would make
-  this recoverable.
-- **Job status is write-once.** A row lands in `videos` only when the job
-  finishes, so a job in flight is invisible to the database; the client sees
-  queue depth, not per-job progress.
-- **The worker trusts the queue payload.** Paths from the job are used directly
-  when building download URLs.
+Retries also go to the back of the queue, since the failure path uses `RPUSH`.
+A job that fails waits behind everything queued since it first ran.
+
+`LPOP` removes the job before the work is done, so a worker that dies mid-job
+takes the job with it. `BLMOVE` into a processing list would make that
+recoverable.
+
+Job status is write-once. A row only lands in `videos` once the job finishes, so
+a job in flight is invisible to the database. The page can show queue depth but
+not per-job progress.
+
+The worker also trusts whatever is in the job payload, using paths from it
+directly when it builds the download URL.

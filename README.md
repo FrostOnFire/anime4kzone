@@ -2,14 +2,13 @@
 
 [![CI](https://github.com/FrostOnFire/anime4kzone/actions/workflows/ci.yml/badge.svg)](https://github.com/FrostOnFire/anime4kzone/actions/workflows/ci.yml)
 
-A distributed pipeline for upscaling anime episodes. A browser uploads an
-episode, a main server records its metadata and queues the job, and a rented
-GPU machine picks the job up and runs [Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN)
-over it.
+Upscales anime episodes across three machines. You drop a file into the browser,
+the main server saves it and puts a job on a queue, and a rented GPU box picks
+the job up and runs [Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN) over it.
 
-The work is split across three machines because the GPU was the expensive part:
-it was rented by the hour and had to stay independent of the always-on server
-holding the database and the uploads.
+Three machines because GPU time is the part that costs money. The GPU was rented
+by the hour, so nothing that needed to survive a reboot could live on it: the
+database, the uploads and the queue all sit on the always-on server instead.
 
 ```mermaid
 flowchart LR
@@ -30,22 +29,19 @@ flowchart LR
 
 ## How a job flows
 
-1. The browser autocompletes the title against the [Shikimori](https://shikimori.one)
-   GraphQL API, which fills in the cover, genres, episode count and rating.
-   The uploader adds the episode number, franchise, dub and the timestamps of
-   the opening, so a player can offer a skip later.
-2. `POST /upload` stores the file, writes the metadata and pushes a job onto the
-   `video_jobs` list in Redis. The client polls `/queue-status` for the queue
-   length.
-3. The GPU worker pops a job, downloads the source from the main server, and
-   upscales it in a worker thread so the queue loop stays responsive. It runs
-   the `realesr-animevideov3` model at 3x with 8 processes on the GPU.
-4. The worker reports back to `POST /update-job`, which writes the episode into
-   a five-table schema: `franchises`, `animes`, `genres`, `videos` and the
-   `anime_genres` join table.
-
-A single episode took a few hours to process, so demo clips were kept to 10-60
-seconds.
+1. You start typing a title and the browser autocompletes it against the
+   [Shikimori](https://shikimori.one) GraphQL API, which fills in the cover,
+   genres, episode count and rating. You add the episode number, the franchise,
+   which dub it is, and where the opening starts, so a player can skip it later.
+2. `POST /upload` saves the file, writes the metadata and pushes a job onto the
+   `video_jobs` list in Redis. The page polls `/queue-status` to show how many
+   jobs are waiting.
+3. The worker pops a job, downloads the source, and upscales it in a worker
+   thread so the queue loop keeps running. The model is `realesr-animevideov3`
+   at 3x, eight processes on the GPU.
+4. The worker posts back to `/update-job`, which writes the episode into five
+   tables: `franchises`, `animes`, `genres`, `videos`, and `anime_genres` to
+   link the last two.
 
 ## Layout
 
@@ -58,12 +54,12 @@ seconds.
 | `*/*.service` | systemd units, installed by the provisioning scripts |
 | `docs/architecture.md` | Endpoints, data model and design notes |
 
-Real-ESRGAN is not vendored here. `gpu-worker/setup.sh` installs it from
-upstream, pinned to the v0.3.0 the worker was built against.
+Real-ESRGAN is not vendored here. `gpu-worker/setup.sh` clones it from upstream
+and checks out v0.3.0, which is what the worker was built against.
 
 ## Running it
 
-Both nodes are provisioned by script on Ubuntu:
+Both nodes have a provisioning script, written for Ubuntu:
 
 ```bash
 # Main server (PC-2): nginx, PostgreSQL, Redis, the Express app
@@ -78,28 +74,27 @@ cp gpu-worker/.env.example gpu-worker/.env     # point it at the main server
 sudo systemctl start anime4kzone-worker
 ```
 
-Both scripts install a systemd unit, so each node restarts on failure and comes
-back after a reboot. Logs go to the journal:
-`journalctl -u anime4kzone -f`.
+Each script installs a systemd unit, so a node restarts if it crashes and comes
+back after a reboot. Logs go to the journal: `journalctl -u anime4kzone -f`.
 
-nginx serves the client and proxies every API call to the Express server, so
-the two are same-origin and nothing but port 8080 needs to be exposed.
+nginx serves the page and proxies every API call through to Express, so both
+are on the same origin and only port 8080 is open to the outside.
 
-## Status
+## What works and what doesn't
 
-The pipeline worked end to end: uploads were queued, upscaled on the GPU node
-and written back to the database. Three things were planned and never built,
-and the code says so where it matters:
+The pipeline ran end to end: upload, queue, upscale on the GPU node, write the
+result back to Postgres. One episode took a few hours, which is why the demo
+clips were only 10-60 seconds long.
 
-- **No streaming site.** Episodes were processed and recorded, but the viewing
-  front end for them was never written.
-- **No cloud upload.** `uploadToGoogleCloud` in the worker returns a placeholder
-  URL, so results stayed on the GPU node.
-- **No surviving samples.** The short before/after clips were not kept.
+Three things never got built. There is no site to actually watch the episodes
+on, which was the original idea and the part I never wrote.
+`uploadToGoogleCloud` in the worker is a stub that hands back a fake URL, so
+finished files stayed on the GPU node instead of going anywhere. And the
+before/after clips are gone. I did not keep them.
 
-The worker has been untouched since 2024 and is written against the node-redis
-v3 callback API, while the main server moved on to the v4 promise API; each
-manifest pins its own version accordingly.
+The worker has not been touched since 2024. It talks to Redis through the
+node-redis v3 callback API while the main server has moved on to v4 promises,
+so each side pins its own version.
 
 ## Stack
 
@@ -108,4 +103,4 @@ Shikimori GraphQL API, Dropzone.js.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT, see [LICENSE](LICENSE).

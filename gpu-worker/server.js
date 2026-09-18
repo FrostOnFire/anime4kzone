@@ -1,4 +1,4 @@
-// server.js — the GPU worker (PC-3)
+// server.js, the GPU worker (PC-3)
 
 const redis = require('redis');
 const { Worker } = require('worker_threads');
@@ -54,7 +54,7 @@ function processNextJob() {
 
             await processVideo(localInputPath, localOutputPath);
 
-            // Upload the result — NOT IMPLEMENTED, see uploadToGoogleCloud below
+            // Upload the result. NOT IMPLEMENTED, see uploadToGoogleCloud below
             const videoUrl = await uploadToGoogleCloud(localOutputPath);
 
             // Report the result back to the main server

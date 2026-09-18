@@ -59,7 +59,7 @@ async function getAccessToken() {
         // still valid
         return tokenData.accessToken;
       } else {
-        // expired — fetch a new one
+        // expired, so fetch a new one
         console.log('Access token expired, fetching a new one.');
         return await fetchAccessToken();
       }

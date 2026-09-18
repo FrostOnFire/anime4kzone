@@ -9,16 +9,16 @@ const http = require('http');
 const { v4: uuidv4 } = require('uuid');
 const redis = require('redis');
 const { Pool } = require('pg');
-const fetch = require('node-fetch'); // node-fetch v2 — the last CommonJS release
+const fetch = require('node-fetch'); // node-fetch v2, the last version that works with require()
 
 require('dotenv').config(); // loads environment variables from .env
 
 const app = express();
 app.set('trust proxy', true);
 
-// CORS is only enabled when the client is served from another host. Behind the
-// bundled nginx config it is same-origin, so no CORS headers are sent at all —
-// reflecting an arbitrary origin while allowing credentials would be unsafe.
+// CORS only matters when the client is served from a different host. Behind the
+// bundled nginx config it is same-origin, so nothing is sent. Reflecting back
+// whatever Origin arrives while also allowing credentials would be unsafe.
 if (process.env.CLIENT_ORIGIN) {
     app.use(cors({
         origin: process.env.CLIENT_ORIGIN,
@@ -35,7 +35,7 @@ app.use(express.urlencoded({ extended: true, limit: '3gb', timeout: 3600000 }));
 const uploadDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
-// Redis — the job queue shared with the GPU worker
+// Redis, the job queue the GPU worker reads from
 const redisClient = redis.createClient({
     url: process.env.REDIS_URL || 'redis://localhost:6379',
 });
